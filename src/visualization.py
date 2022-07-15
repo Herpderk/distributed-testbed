@@ -5,8 +5,7 @@ import random
 
 class Plot_3D:
 
-
-    def __init__ (self):
+    def __init__(self):
         # dimensions of 3d space in cm
         self.x_length_cm = 100
         self.y_length_cm = 100
@@ -18,9 +17,9 @@ class Plot_3D:
         self.z_coords = np.zeros(self.num_robots)
         # colors to identify each robot
         tracker_colors = {
-            0:'red',
-            1:'green',
-            2:'blue'
+            0: 'red',
+            1: 'green',
+            2: 'blue'
         }
         self.colors = []
         for i in range(self.num_robots):
@@ -29,12 +28,11 @@ class Plot_3D:
         self.labels = []
         for i in range(self.num_robots):
             self.labels.append('robot' + str(i))
-        #initialize figures
+        # initialize figures
         plt.ion()
         fig = plt.figure(figsize=(12, 5))
         self.ax1 = fig.add_subplot(1, 2, 1, projection='3d')
         self.ax2 = fig.add_subplot(1, 2, 2)
-        
 
     def update_plot(self, id, position):
         self.x_coords[id] = position[0]
@@ -42,13 +40,15 @@ class Plot_3D:
         self.z_coords[id] = position[2]
 
         self.ax1.clear()
-        self.ax1.scatter3D(self.x_coords, self.y_coords, self.z_coords, c=self.colors)
+        self.ax1.scatter3D(self.x_coords, self.y_coords,
+                           self.z_coords, c=self.colors)
 
         self.ax1.set_xlim(0, self.x_length_cm)
         self.ax1.set_ylim(0, self.y_length_cm)
         self.ax1.set_zlim(0, self.z_length_cm)
         for i in range(self.num_robots):
-            self.ax1.text(self.x_coords[i], self.y_coords[i], self.z_coords[i], self.labels[i])
+            self.ax1.text(
+                self.x_coords[i], self.y_coords[i], self.z_coords[i], self.labels[i])
 
         self.ax2.clear()
         self.ax2.scatter(self.x_coords, self.y_coords, c=self.colors)
