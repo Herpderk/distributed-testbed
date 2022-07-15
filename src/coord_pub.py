@@ -8,10 +8,9 @@ class CoordinatePublisher:
 	def __init__(self):
 		# initialize node
 		rospy.init_node('coordinate_publisher')
-		# input the number of agents and create a topic for each one
-		num_robots = 3
-		topics = []
-		for i in range(num_robots):
+		# input the ids of each tracker
+		tracker_ids = [0, 1, 2]
+		for i in tracker_ids:
 			self.pub = rospy.Publisher("robot" + str(i), Float32MultiArray, queue_size=100)
 			
 			
