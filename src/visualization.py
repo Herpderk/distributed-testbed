@@ -1,9 +1,5 @@
-from matplotlib.pyplot import figure
-from mpl_toolkits import mplot3d
 import matplotlib.pyplot as plt
-
 import numpy as np
-import time
 import random
 
 
@@ -68,7 +64,6 @@ class Plot_3D:
 
 if __name__ == '__main__':
     new_plot = Plot_3D()
-    print(new_plot.labels)
     while True:
         for i in range(3):
             new_plot.update_plot(i, np.array([random.randrange(0, 100, 1),
