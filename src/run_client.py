@@ -13,7 +13,7 @@ def receiveMoCapFrame( frameNumber, markerSetCount, unlabeledMarkersCount, rigid
 
 # callback function for rigid body frame
 def receiveRigidBodyFrame( publisher, id, position, rotation ):
-    print( "pos of robot", id, " ", position,"\n ")
+    print( "pos of robot", id, position,"\n ")
     publisher.publish(id, position)
     time.sleep(0.03)
 
