@@ -6,14 +6,14 @@ import coord_pub
 
 
 # callback function for motion capture frame
-def receiveMoCapFrame( frameNumber, markerSetCount, unlabeledMarkersCount, rigidBodyCount, skeletonCount,
-                    labeledMarkerCount, timecode, timecodeSub, timestamp, isRecording, trackedModelsChanged ):
-    print("timestamp: ",timestamp,"\n ")
+def receiveMoCapFrame(frameNumber, markerSetCount, unlabeledMarkersCount, rigidBodyCount, skeletonCount,
+                      labeledMarkerCount, timecode, timecodeSub, timestamp, isRecording, trackedModelsChanged):
+    print("timestamp: ", timestamp, "\n ")
 
 
 # callback function for rigid body frame
-def receiveRigidBodyFrame( publisher, id, position, rotation ):
-    print( "pos of robot", id, position,"\n ")
+def receiveRigidBodyFrame(publisher, id, position, rotation):
+    print("pos of robot", id, " ", position, "\n ")
     publisher.publish(id, position)
     time.sleep(0.03)
 
