@@ -1,10 +1,11 @@
 import matplotlib.pyplot as plt
 from scipy import linalg as la
+from simple_pid import PID
 import numpy as np
 import time
 
 
-class LQR_Controller:
+class LQR_PID:
 
 
     def __init__(self):
@@ -53,67 +54,72 @@ class LQR_Controller:
         return K
 
 
-    def control_action(self, path_pos, curr_pos):
+    def lqr_steer(self, path_pos, curr_pos, curr_spd):
         print('ideal position: ' + str(path_pos))
 
         error = path_pos - curr_pos
         print('error: ' + str(error))
-
-        U = self.K @ error
-        print('control action: ' + str(U))
         
-        U = self.V*(U/np.linalg.norm(U))
+        U = self.K @ error
+        U = curr_spd * (U/np.linalg.norm(U))
+        print('control action: ' + str(U))
 
         next_error = (self.A @ error) - (self.B @ U)
         print('next error: ' + str(next_error))
 
         next_pos = path_pos - next_error
         print('next pos: ' + str(next_pos))
+        print()
 
         return np.array([U, next_pos])
 
 
-    def pid_speed(self, nxt_pts, curr_spd):
-        std_dev = np.std(nxt_pts, axis=0)
-        dev_mag = np.sqrt(np.einsum('i,i', std_dev, std_dev))
+    def pid_speed(self, pid, nxt_angles, curr_spd):
+        avg_turn = np.average(nxt_angles)
+        ideal_spd = self.V*((1 - avg_turn/np.pi)**25)
+        
+        pid.setpoint = ideal_spd
+        nxt_spd = pid(curr_spd)
 
-        cost = dev_mag**10
-        nxt_spd = cost*
-        print(cost)
+        print('NEXT SPEED: ' + str(nxt_spd))
+        return nxt_spd
 
 
     def path_tracking(self, path):
+    	#initialize plot
         ax1, plt = self.init_plot(path)
+        #initialize pid object
+        pid = PID(1, 0, 0.4, setpoint=self.V)
+        pid.output_limits = (0, 1.5*self.V)
         # declare the starting position and iterate through waypoints
         pos = np.array([0, 0, 0])
-        
-        for i in range (np.size(path, 0)):
-            '''
-            nextXs = np.array([
-                path[i][0], path[i+1][0], path[i+2][0], path[i+3][0], path[i+4][0], path[i+5][0]
-                ])
-            nextYs = np.array([
-                path[i][1], path[i+1][1], path[i+2][1], path[i+3][1], path[i+4][1], path[i+5][1]
-                ])
-            nextThetas = np.array([
-                path[i][2], path[i+1][2], path[i+2][2], path[i+3][2], path[i+4][2], path[i+5][2]
-                ])
-            nextX = np.average(nextXs)
-            nextY = np.average(nextYs)
-            nextTheta = np.average(nextThetas)
-            wp = np.array([
-                nextX, nextY, nextTheta
-                ])
-            '''
-            wp = path[i]
-            error = wp - pos
-            error_mag = np.sqrt(np.einsum('i,i', error, error))
+        horizon = 8
 
-            while abs(error_mag > 20):
-                self.plot_path(ax1, plt, pos)
-                pos = self.control_action(wp, pos)[1]
+        for i in range (np.size(path, 0) - horizon):
+            wp = path[i]
+            spd = 0
+
+            while True:
                 error = wp - pos
                 error_mag = np.sqrt(np.einsum('i,i', error, error))
+            	
+                if error_mag > 20:
+                    self.plot_path(ax1, plt, pos)
+                    
+                    nxt_angles = np.array([
+                        abs(path[i+1][2] - path[i][2])
+            	        ])
+                    for j in range(2, horizon+1):
+                        nxt_angles = np.append(nxt_angles, 
+                        	[abs(path[i+j][2] - path[i+j-1][2])], 
+                        	axis=0)
+
+                    spd = self.pid_speed(pid, nxt_angles, spd)
+                    state = self.lqr_steer(wp, pos, spd)
+                    pos = state[1]
+                    vel = state[0]
+                else:
+                    break
 
 
     def init_plot(self, path):
@@ -149,32 +155,29 @@ class LQR_Controller:
         path = np.append(waypoints, new_col, 1)
         return path
 
-'''
-deltaTheta = np.arccos(
-            (np.dot(v0, v1)) / (np.sqrt(v0.dot(v0))*np.sqrt(v1.dot(v1))))
-            '''
-if __name__ == "__main__":
-    new_controller = LQR_Controller()
-    wp1 = np.array([
-    	[-1,1],
-    	[0, 0],
-    	[1,1]
-    	])
-    wp2 = np.array([
-        [0, 0],
-        [1, 1],
-        [2, 2]
-    	])
-    
-    new_controller.pid_speed(wp1, 300)
-    new_controller.pid_speed(wp2, 300)
-    '''
+
+def sine_wave(size, num_points):
     waypoints = np.array([[0, 0]])
+    for t in range(1, num_points):
+    	waypoints = np.append(waypoints, [[t, (size/2)*np.sin((5*(2*np.pi*t/num_points) - np.pi/2))+(size/2)]], axis = 0)
+    return waypoints
+
+
+def circle(size, num_points):
+    waypoints = np.array([[0, 0]])
+    for t in range(1, num_points):
+    	waypoints = np.append(waypoints, [[(size/2) + (size/2)*np.cos(2*np.pi*t/num_points), 
+    	    	                               (size/2) + (size/2)*np.sin(2*np.pi*t/num_points)]], axis = 0)
+    return waypoints
+
+
+if __name__ == "__main__":
+    controller = LQR_PID()
+
     size = 1000
     num_points = 1000
-    for t in range(1, num_points):
-    	waypoints = np.append(waypoints, [[t, (size/2)*np.sin(1*t*(np.pi/180.))+(size/2)]], axis = 0)
+    waypoints = sine_wave(size, num_points)
 
-    path = new_controller.path(waypoints)
-    new_controller.path_tracking(path)
-    '''
+    path = controller.path(waypoints)
+    controller.path_tracking(path)
+    
