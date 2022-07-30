@@ -57,7 +57,7 @@ class LQR_PID:
     def pid_speed(self, pid, nxt_angles, curr_spd):
         avg_turn = np.average(nxt_angles)
         #The exponent causes sharper deceleration, decrease if it's too aggressive
-        ideal_spd = self.V*((1 - avg_turn/np.pi)**25)
+        ideal_spd = self.V*((1 - avg_turn/np.pi)**20)
         
         pid.setpoint = ideal_spd
         nxt_spd = pid(curr_spd)
@@ -67,21 +67,14 @@ class LQR_PID:
 
     # Calculates u, inputs the pid speed, and calculates the next state A*x - B*u
     def lqr_steer(self, path_pos, curr_pos, curr_spd):
-        #print('ideal position: ' + str(path_pos))
-
         error = path_pos - curr_pos
-        #print('error: ' + str(error))
         
         U = self.K @ error
         U = curr_spd * (U/np.linalg.norm(U))
         print('control action: ' + str(U))
 
         next_error = (self.A @ error) - (self.B @ U)
-        #print('next error: ' + str(next_error))
-
         next_pos = path_pos - next_error
-        #print('next pos: ' + str(next_pos))
-
         return np.array([U, next_pos])
 
     # Uses inverse kinematics to calculate the angular velocity of each wheel
@@ -107,38 +100,37 @@ class LQR_PID:
         path = np.append(waypoints, new_col, 1)
         return path
 
-    # Initializes the plot
+    
     def init_plot(self, path):
-    	# initialize plot
         plt.ion()
         fig = plt.figure(figsize=(6, 6))
         ax1 = fig.add_subplot(1, 1, 1)
-        # plot waypoints from path
+        
         wp_X = []
         wp_Y = []
         for wp in path:
             wp_X.append(wp[0])
             wp_Y.append(wp[1])
+
         ax1.scatter(wp_X, wp_Y, c='blue', s=25)
         return ax1, plt
 
-    # Plots the position at every given time frame
+   
     def plot_path(self, ax1, plt, pos):
         ax1.scatter(pos[0], pos[1], c='red', s=5)
         ax1.set_xlim(0, 1000)
         ax1.set_ylim(0, 1000)
-        #ax1.annotate(str(pos[2]) + ' rads', (pos[0], pos[1]))
         plt.draw()
         plt.pause(0.001)
 
-    # Where everything comes together
+
     def path_tracking(self, path):
-    	#initialize plot and pid
         ax1, plt = self.init_plot(path)
-        pid = PID(1, 0, 0.4, setpoint=self.V)
+        pid = PID(1, 0, 0.1, setpoint=self.V)
         pid.output_limits = (0, 1.5*self.V)
-        # declare the starting position, prediction horizon, and iterate through waypoints
+        
         pos = path[0]
+        #increase prediction horizon to decelerate earlier
         horizon = 8
 
         for i in range (np.size(path, 0) - horizon):
