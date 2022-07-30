@@ -33,6 +33,7 @@ class LQR_PID:
                            [0, 0, self.time_step]])
         self.K = self.K_matrix()
 
+
     # The solution to the optimal control policy u = K*x
     def K_matrix(self):
         A = self.A
@@ -53,10 +54,10 @@ class LQR_PID:
         K = la.inv(R) @ np.transpose(self.B) @ P
         return K
 
+
     # Continuously adjusts the setpoint of the pid based on turn angles in the horizon
     def pid_speed(self, pid, nxt_angles, curr_spd):
         avg_turn = np.average(nxt_angles)
-        #The exponent causes sharper deceleration, decrease if it's too aggressive
         ideal_spd = self.V*((1 - avg_turn/np.pi)**20)
         
         pid.setpoint = ideal_spd
@@ -64,6 +65,7 @@ class LQR_PID:
 
         print('next speed: ' + str(nxt_spd))
         return nxt_spd
+
 
     # Calculates u, inputs the pid speed, and calculates the next state A*x - B*u
     def lqr_steer(self, path_pos, curr_pos, curr_spd):
@@ -77,6 +79,7 @@ class LQR_PID:
         next_pos = path_pos - next_error
         return np.array([U, next_pos])
 
+
     # Uses inverse kinematics to calculate the angular velocity of each wheel
     def motor_spds(self, vel):
         kinematics = np.array([
@@ -89,6 +92,7 @@ class LQR_PID:
         print('angular speeds: ' + str(ang_vel))
         print()
         return ang_vel
+
 
     # Adds angles between (x,y) waypoints to be used for steering
     def gen_path(self, waypoints):
@@ -124,13 +128,13 @@ class LQR_PID:
         plt.pause(0.001)
 
 
+#increase prediction horizon to decelerate earlier
     def path_tracking(self, path):
         ax1, plt = self.init_plot(path)
         pid = PID(1, 0, 0.1, setpoint=self.V)
         pid.output_limits = (0, 1.5*self.V)
         
-        pos = path[0]
-        #increase prediction horizon to decelerate earlier
+        pos = path[0]    
         horizon = 8
 
         for i in range (np.size(path, 0) - horizon):
