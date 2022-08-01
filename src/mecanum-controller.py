@@ -24,7 +24,7 @@ class LQR_PID:
         self.wheel_radius = radius # mm
         self.center_X = width/2    # mm
         self.center_Y = height/2   # mm
-        self.max_V = v                 # mm/s
+        self.max_V = v             # mm/s
         self.time_step = 0.1       # s
         self.K1 = self.K_matrix()
 
@@ -38,7 +38,7 @@ class LQR_PID:
             [0, 1, 0],
             [0, 0, 1]
             ])
-        #punishes speed
+        #R punishes actuation
         R = 0.1 * np.array([
             [1, 0, 0],
             [0, 1, 0],
@@ -46,7 +46,7 @@ class LQR_PID:
             ])
 
         self.A1 = np.block([
-            [A,                   B],
+            [A,                       B],
             [np.zeros((3,3)), np.eye(3)]
             ])
         self.B1 = np.block([
@@ -57,7 +57,7 @@ class LQR_PID:
             [Q,         np.zeros((3,3))],
             [np.zeros((3,3)),         R]
             ])
-        #punishes turning
+        #R1 punishes turning
         self.R1 = 4 * np.array([
             [1, 0, 0],
             [0, 1, 0],
@@ -109,7 +109,6 @@ class LQR_PID:
         print('pos:' + str(nxt_pos))
         print('vel:' + str(nxt_vel))
         print('spd:' + str(nxt_spd))
-
         return nxt_pos, nxt_vel
 
 
@@ -131,11 +130,9 @@ class LQR_PID:
     # Adds angles between (x,y) waypoints to be used for steering
     def gen_path(self, waypoints):
         new_col = np.zeros((waypoints.shape[0], 1))
-
         for i in range(new_col.shape[0] - 1):
             x_diff = waypoints[i+1, 0] - waypoints[i, 0]
             y_diff = waypoints[i+1, 1] - waypoints[i, 1]
-
             angle = np.arctan2(y_diff, x_diff)
             new_col[i + 1] = (angle)
         
@@ -154,6 +151,7 @@ class LQR_PID:
             fig.canvas.manager.window.SetPosition((x, y))
         else:
             fig.canvas.manager.window.move(x, y)
+        plt.xlim(0, 1100)
 
         wp_X = np.empty((1), float)
         wp_Y = np.empty((1), float)
@@ -172,10 +170,10 @@ class LQR_PID:
     def plot_path(self, ax1, fig, bg, pos):
         (pt,) = ax1.plot(pos[0], pos[1], 'rP', markersize=5)
         pt.set_data(pos[0], pos[1])
+        plt.xlim(0, 1100)
 
         fig.canvas.restore_region(bg)
         ax1.draw_artist(pt)
-
         fig.canvas.blit(fig.bbox)
         fig.canvas.flush_events()
 
@@ -200,7 +198,7 @@ class LQR_PID:
             while True:
                 error = wp - pos
                 error_mag = np.sqrt(np.einsum('i,i', error, error))
-                error_lim = -42.5 + 10.75*self.R1[0][0] + 0.2275*self.max_V 
+                error_lim = 10.75*self.R1[0][0] + 0.2275*self.max_V - 36
             	# IMPORTANT: if error limit is too small, infinite oscillation occurs
                 if error_mag > error_lim:
                     nxt_turns = np.empty((1), float)
@@ -222,7 +220,7 @@ def sine_wave(size, num_points):
     waypoints = np.empty((0, 2), float)
     for t in range(num_points):
     	waypoints = np.append(waypoints, [[t, 
-    		(size/2)*np.sin((10*(2*np.pi*t/num_points) - np.pi/2))+(size/2)]], axis = 0)
+    		(size/2)*np.sin((5*(2*np.pi*t/num_points) - np.pi/2))+(size/2)]], axis = 0)
     return waypoints
 
 
@@ -246,7 +244,6 @@ if __name__ == "__main__":
     # wheel radius, width, height, and max velocity in terms of mm and s
     controller = LQR_PID(64.5, 46.5, 93.0, 300.0)
     # make sure path has points in the form of (x,y) or (x,y,theta)
-    
     size = 1000
     num_points = 1000
     waypoints = sine_wave(size, num_points)
