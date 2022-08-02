@@ -1,7 +1,7 @@
 # BACKGROUND
 # A controller that combines an LQR for steering with PID speed control for optimal path tracking.
 # The LQR's control policy is found using SciPy's solver for the discrete-time algebraic Riccati equation.
-# The PID is provided by the simple-pid python package, and the setpoint of the speed adjusts for turn angles. 
+# The PID is provided by the simple-pid python package, and the setpoint of the speed adjusts for sharp turns. 
 # This controller is intended for 4-wheel mecanum drive systems.
 
 # INSTRUCTIONS
@@ -70,40 +70,45 @@ class LQR_PID:
 
 
     # Continuously adjusts the setpoint of the pid based on turn angles in the horizon
-    def pid_speed(self, pid, net_turn, curr_spd):
-        if np.cos(net_turn) >= 0:
-                cost = abs(0.5*np.sin(net_turn))
-        elif np.cos(net_turn) < 0:
-                cost = abs(0.5 - 0.5*np.cos(net_turn)) 
+    def pid_speed(self, pid, nxt_turns, curr_spd):
+        costs = np.empty((1), float)
+        for theta in nxt_turns:
+            if np.cos(theta) >= 0:
+                costs = np.append(costs, [abs(0.5*np.sin(theta))])
+            elif np.cos(theta) < 0:
+                costs = np.append(costs, [abs(0.5 - 0.5*np.cos(theta))]) 
 
-        ideal_spd = 90*self.max_V*((1 - cost)**8)
-        pid.setpoint = ideal_spd
+        avg_cost = np.average(costs)
+        #print('cost: ' + str(avg_cost))
+        ideal_spd = self.max_V*((1 - avg_cost)**6)
+        #print('setpoint: ' + str(ideal_spd))
         
-        if (curr_spd > 0.2*self.max_V) & (ideal_spd > 0.2*90*self.max_V):
-            pid.reset()
-            pid.tunings = (0.01, 0.0, 0.00)
-        elif (curr_spd < 0.2*self.max_V) & (ideal_spd > 0.2*90*self.max_V):
-            pid.reset()
-            pid.tunings = (0.01, 0.005, 0.0)
+        pid.setpoint = ideal_spd
+        nxt_spd = pid(curr_spd)
 
-        nxt_spd = pid(curr_spd, self.time_step)
+        #print('next speed: ' + str(nxt_spd))
         return nxt_spd
 
 
     # Calculates u, inputs the pid speed, and calculates the next state A*x - B*u
-    def lqr_steer(self, path_pos, pos, vel, spd):
+    def lqr_steer(self, path_pos, pos, vel):
         error = path_pos - pos
-        state = np.block([error, vel])
+        state = np.block([
+            error, vel
+        ])
+
         U = self.K1 @ state
+        #U = curr_spd * (U/np.linalg.norm(U))
         nxt_state = (self.A1 @ state) - (self.B1 @ U)
 
         nxt_err, nxt_vel = np.split(nxt_state, 2)
         nxt_pos = path_pos - nxt_err
-        nxt_vel = spd * nxt_vel / np.sqrt(np.einsum('...i,...i', nxt_vel, nxt_vel))
+        nxt_vel = self.max_V * nxt_vel / np.sqrt(np.einsum('...i,...i', nxt_vel, nxt_vel))
         nxt_spd = np.sqrt(np.einsum('...i,...i', nxt_vel, nxt_vel))
 
-        print('spd:' + str(nxt_spd))
+        print('pos:' + str(nxt_pos))
         print('vel:' + str(nxt_vel))
+        print('spd:' + str(nxt_spd))
         return nxt_pos, nxt_vel
 
 
@@ -138,7 +143,8 @@ class LQR_PID:
     def init_plot(self, path):
         fig, ax1 = plt.subplots(figsize=(8, 7))
         backend = matplotlib.get_backend()
-        x, y = 900, 50
+        x = 50
+        y = 50
         if backend == 'TkAgg':
             fig.canvas.manager.window.wm_geometry("+%d+%d" % (x, y))
         elif backend == 'WXAgg':
@@ -175,12 +181,12 @@ class LQR_PID:
     # increase prediction horizon to decelerate earlier
     def path_tracking(self, path):
         ax1, fig, bg = self.init_plot(path)
-        pid = PID(0.04, 0.0, 0.0, setpoint = 90*self.max_V)
+        pid = PID(0.4, 0.0, 0.0, setpoint=self.max_V)
         pid.output_limits = (0, self.max_V)
         
         pos = path[0] 
         vel = np.array([0, 0, 0])   
-        horizon = 7
+        horizon = 10
 
         for i in range (np.size(path, 0) - horizon):
             if np.size(path, 0) - i < horizon:
@@ -192,17 +198,19 @@ class LQR_PID:
             while True:
                 error = wp - pos
                 error_mag = np.sqrt(np.einsum('i,i', error, error))
-                error_lim = 50 #10.75*self.R1[0][0] + 0.2275*self.max_V - 45
+                error_lim = 10.75*self.R1[0][0] + 0.2275*self.max_V - 36
             	# IMPORTANT: if error limit is too small, infinite oscillation occurs
                 if error_mag > error_lim:
-                    net_turn = path[i+horizon][2] - path[i][2]
-                    spd = self.pid_speed(pid, net_turn, spd)
+                    nxt_turns = np.empty((1), float)
+                    for j in range(horizon):
+                        nxt_turns = np.append(nxt_turns, 
+                        	[(path[i+j+1][2] - path[i+j][2])], axis=0)
 
-                    pos, vel = self.lqr_steer(wp, pos, vel, spd)
+                    spd = self.pid_speed(pid, nxt_turns, spd)
+                    pos, vel = self.lqr_steer(wp, pos, vel)
                     ang_spds = self.motor_spds(vel)
-
                     self.plot_path(ax1, fig, bg, pos)
-                    time.sleep(0.03)
+                    time.sleep(0.025)
                 else:
                     break
 
@@ -227,8 +235,8 @@ def circle(size, num_points):
 def lissajous(size, num_points):
     waypoints = np.empty((0, 2), float)
     for t in range(num_points):
-        waypoints = np.append(waypoints, [[(size/2) + (size/2)*np.cos(7*2*np.pi*t/num_points), 
-    	                     (size/2) + (size/2)*np.sin(5*2*np.pi*t/num_points)]], axis = 0)
+        waypoints = np.append(waypoints, [[(size/2) + (size/2)*np.cos(5*2*np.pi*t/num_points), 
+    	                     (size/2) + (size/2)*np.sin(2*2*np.pi*t/num_points)]], axis = 0)
     return waypoints
     
 
@@ -238,7 +246,7 @@ if __name__ == "__main__":
     # make sure path has points in the form of (x,y) or (x,y,theta)
     size = 1000
     num_points = 1000
-    waypoints = lissajous(size, num_points)
+    waypoints = sine_wave(size, num_points)
     # if points are (x,y) then run it through gen_path
     path = controller.gen_path(waypoints)
     controller.path_tracking(path)
