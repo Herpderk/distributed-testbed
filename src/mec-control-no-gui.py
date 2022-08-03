@@ -11,7 +11,7 @@
 
 from scipy import linalg as la
 from simple_pid import PID
-import jax.numpy as jnp
+import numpy as np
 import time
 
 
@@ -30,34 +30,34 @@ class LQR_PID:
 
     # The solution to the optimal control policy u = K*x
     def K_matrix(self):
-        A = jnp.eye(3)
-        B = self.time_step*jnp.eye(3)
-        Q = 1 * jnp.array([
+        A = np.eye(3)
+        B = self.time_step*np.eye(3)
+        Q = 1 * np.array([
             [1, 0, 0],
             [0, 1, 0],
             [0, 0, 1]
             ])
         #R punishes actuation
-        R = 0.1 * jnp.array([
+        R = 0.1 * np.array([
             [1, 0, 0],
             [0, 1, 0],
             [0, 0, 1]
             ])
 
-        self.A1 = jnp.block([
+        self.A1 = np.block([
             [A,                       B],
-            [jnp.zeros((3,3)), jnp.eye(3)]
+            [np.zeros((3,3)), np.eye(3)]
             ])
-        self.B1 = jnp.block([
+        self.B1 = np.block([
             [B        ],
-            [jnp.eye(3)]
+            [np.eye(3)]
             ])
-        Q1 = jnp.block([
-            [Q,         jnp.zeros((3,3))],
-            [jnp.zeros((3,3)),         R]
+        Q1 = np.block([
+            [Q,         np.zeros((3,3))],
+            [np.zeros((3,3)),         R]
             ])
         #R1 punishes turning
-        self.R1 = 4 * jnp.array([
+        self.R1 = 4 * np.array([
             [1, 0, 0],
             [0, 1, 0],
             [0, 0, 1]
@@ -71,10 +71,10 @@ class LQR_PID:
     # Continuously adjusts the setpoint of the pid based on turn angles in the horizon
     def pid_speed(self, pid, net_turn, curr_spd):
         if self.speed_control:
-            if jnp.cos(net_turn) >= 0:
-                    cost = abs(0.5*jnp.sin(net_turn))
-            elif jnp.cos(net_turn) < 0:
-                    cost = abs(0.5 - 0.5*jnp.cos(net_turn)) 
+            if np.cos(net_turn) >= 0:
+                    cost = abs(0.5*np.sin(net_turn))
+            elif np.cos(net_turn) < 0:
+                    cost = abs(0.5 - 0.5*np.cos(net_turn)) 
 
             ideal_spd = 90*self.max_V*((1 - cost)**8)
             pid.setpoint = ideal_spd
@@ -96,14 +96,14 @@ class LQR_PID:
     # Calculates u, inputs the pid speed, and calculates the next state A*x - B*u
     def lqr_steer(self, path_pos, pos, vel, spd):
         error = path_pos - pos
-        state = jnp.block([error, vel])
+        state = np.block([error, vel])
         U = self.K1 @ state
         nxt_state = (self.A1 @ state) - (self.B1 @ U)
 
-        nxt_err, nxt_vel = jnp.split(nxt_state, 2)
+        nxt_err, nxt_vel = np.split(nxt_state, 2)
         nxt_pos = path_pos - nxt_err
-        nxt_vel = spd * nxt_vel / jnp.sqrt(jnp.einsum('...i,...i', nxt_vel, nxt_vel))
-        nxt_spd = jnp.sqrt(jnp.einsum('...i,...i', nxt_vel, nxt_vel))
+        nxt_vel = spd * nxt_vel / np.sqrt(np.einsum('...i,...i', nxt_vel, nxt_vel))
+        nxt_spd = np.sqrt(np.einsum('...i,...i', nxt_vel, nxt_vel))
 
         print('spd:' + str(nxt_spd))
         print('vel:' + str(nxt_vel))
@@ -112,7 +112,7 @@ class LQR_PID:
 
     # Uses inverse kinematics to calculate the angular velocity of each wheel
     def motor_spds(self, vel):
-        kinematics = jnp.array([
+        kinematics = np.array([
             [1, -1, -(self.center_X + self.center_Y)],
             [1,  1,  (self.center_X + self.center_Y)],
             [1,  1, -(self.center_X + self.center_Y)],
@@ -126,14 +126,14 @@ class LQR_PID:
 
     # Adds angles between (x,y) waypoints to be used for steering
     def gen_path(self, waypoints):
-        new_col = jnp.zeros((waypoints.shape[0], 1))
+        new_col = np.zeros((waypoints.shape[0], 1))
         for i in range(new_col.shape[0] - 1):
             x_diff = waypoints[i+1, 0] - waypoints[i, 0]
             y_diff = waypoints[i+1, 1] - waypoints[i, 1]
-            angle = jnp.arctan2(y_diff, x_diff)
-            new_col[i + 1] = (angle)
+            angle = np.arctan2(y_diff, x_diff)
+            new_col[i + 1] = angle
         
-        path = jnp.append(waypoints, new_col, 1)
+        path = np.append(waypoints, new_col, 1)
         return path
 
 
@@ -143,21 +143,20 @@ class LQR_PID:
         pid.output_limits = (0, self.max_V)
         
         pos = path[0] 
-        vel = jnp.array([0, 0, 0])   
+        vel = np.array([0, 0, 0])   
         horizon = 7
 
-        for i in range (jnp.size(path, 0) - horizon):
-            if jnp.size(path, 0) - i < horizon:
-        	    horizon = jnp.size(path, 0) - i
+        for i in range (np.size(path, 0) - horizon):
+            if np.size(path, 0) - i < horizon:
+        	    horizon = np.size(path, 0) - i
 
             wp = path[i]
             spd = 0
 
             while True:
                 st = time.time()
-
                 error = wp - pos
-                error_mag = jnp.sqrt(jnp.einsum('i,i', error, error))
+                error_mag = np.sqrt(np.einsum('i,i', error, error))
                 error_lim = 50 #10.75*self.R1[0][0] + 0.2275*self.max_V - 45
             	# IMPORTANT: if error limit is too small, infinite oscillation occurs
                 if error_mag > error_lim:
@@ -167,7 +166,7 @@ class LQR_PID:
                     pos, vel = self.lqr_steer(wp, pos, vel, spd)
                     ang_spds = self.motor_spds(vel)
 
-                    time.sleep(0.094)
+                    time.sleep(0.09)
                     et = time.time()
                     print('runtime per loop: ' + str(et - st))
                     print()
@@ -177,26 +176,26 @@ class LQR_PID:
 
 # example path functions
 def sine_wave(size, num_points):
-    waypoints = jnp.empty((0, 2), float)
+    waypoints = np.empty((0, 2), float)
     for t in range(num_points):
-    	waypoints = jnp.append(waypoints, [[t, 
-    		(size/2)*jnp.sin((5*(2*jnp.pi*t/num_points) - jnp.pi/2))+(size/2)]], axis = 0)
+    	waypoints = np.append(waypoints, [[t, 
+    		(size/2)*np.sin((5*(2*np.pi*t/num_points) - np.pi/2))+(size/2)]], axis = 0)
     return waypoints
 
 
 def circle(size, num_points):
-    waypoints = jnp.empty((0, 2), float)
+    waypoints = np.empty((0, 2), float)
     for t in range(num_points):
-    	waypoints = jnp.append(waypoints, [[(size/2) + (size/2)*jnp.cos(2*jnp.pi*t/num_points), 
-    	    	                           (size/2) + (size/2)*jnp.sin(2*jnp.pi*t/num_points)]], axis = 0)
+    	waypoints = np.append(waypoints, [[(size/2) + (size/2)*np.cos(2*np.pi*t/num_points), 
+    	    	                           (size/2) + (size/2)*np.sin(2*np.pi*t/num_points)]], axis = 0)
     return waypoints
 
 
 def lissajous(size, num_points):
-    waypoints = jnp.empty((0, 2), float)
+    waypoints = np.empty((0, 2), float)
     for t in range(num_points):
-        waypoints = jnp.append(waypoints, [[(size/2) + (size/2)*jnp.cos(7*2*jnp.pi*t/num_points), 
-    	                     (size/2) + (size/2)*jnp.sin(5*2*jnp.pi*t/num_points)]], axis = 0)
+        waypoints = np.append(waypoints, [[(size/2) + (size/2)*np.cos(7*2*np.pi*t/num_points), 
+    	                     (size/2) + (size/2)*np.sin(5*2*np.pi*t/num_points)]], axis = 0)
     return waypoints
     
 
