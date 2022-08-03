@@ -120,6 +120,11 @@ class LQR_PID:
             ])
 
         ang_vel = (1/self.wheel_radius) * kinematics @ vel
+        frontL = ang_vel[0]
+        frontR = ang_vel[1]
+        backL = ang_vel[2]
+        backR = ang_vel[3]
+        
         print('motor speeds: ' + str(ang_vel))
         return ang_vel
 
