@@ -27,54 +27,53 @@ try:
         m2.forward(100)
         m3.forward(100)
         m4.forward(100)
-'''
-    while True:
+        '''
+        while True:
 #-----------To Drive the Motors Forward------------# 
-        print("Robot Moving Forward ")
-        af.on()
-        motorAll.forward(100)
-        time.sleep(5)
+                print("Robot Moving Forward ")
+                af.on()
+                motorAll.forward(100)
+                time.sleep(5)
 #--------------------------------------------------#
 
 #-----------To Drive the Motors backwards------------# 
-        print("Robot Moving Backward ")
-        af.off()
-        ab.on()
-        motorAll.reverse(100)
-        time.sleep(5)
+                print("Robot Moving Backward ")
+                af.off()
+                ab.on()
+                motorAll.reverse(100)
+                time.sleep(5)
 #--------------------------------------------------#
 
 #-----------To Drive the Motors Left---------------#
-        print("Robot Moving Left ")
-        ab.off()
-        al.on()
-        m1.stop()
-        m2.stop()
-        m3.forward(100)
-        m4.forward(100)
-        time.sleep(5)
+                print("Robot Moving Left ")
+                ab.off()
+                al.on()
+                m1.stop()
+                m2.stop()
+                m3.forward(100)
+                m4.forward(100)
+                time.sleep(5)
 #--------------------------------------------------#
 
 #----------To Drive the Motors Right---------------#
-        print("Robot Moving Right ")
-        ar.on()
-        al.off()
-        m1.forward(100)
-        m2.forward(100)
-        m3.stop()
-        m4.stop()
-        time.sleep(5)
+                print("Robot Moving Right ")
+                ar.on()
+                al.off()
+                m1.forward(100)
+                m2.forward(100)
+                m3.stop()
+                m4.stop()
+                time.sleep(5)
 #-------------------------------------------------#
 
 #---------To Stop the Motors----------------------#
-        print("Robot Stop ")
-        al.off()
-        af.off()
-        ar.off()
-        motorAll.stop()
-        time.sleep(5)
+                print("Robot Stop ")
+                al.off()
+                af.off()
+                ar.off()
+                motorAll.stop()
+                time.sleep(5)
 #-------------------------------------------------#
-'''
-        
+        '''
 except KeyboardInterrupt:
         GPIO.cleanup()
