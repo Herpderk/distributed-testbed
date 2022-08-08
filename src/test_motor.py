@@ -27,13 +27,13 @@ try:
                 for i in range(10):
                         motorAll.forward(10*i)
                         time.sleep(0.1)
-                for i in range(10, 0, -1)
+                for i in range(10, 0, -1):
                         motorAll.forward(10*i)
                         time.sleep(0.1)
                 for i in range(10):
                         motorAll.reverse(10*i)
                         time.sleep(0.1)
-                for i in range(10, 0, -1)
+                for i in range(10, 0, -1):
                         motorAll.reverse(10*i)
                         time.sleep(0.1)
                 time.sleep(2)
