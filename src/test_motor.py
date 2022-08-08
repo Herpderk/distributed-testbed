@@ -23,10 +23,20 @@ ar = PiMotor.Arrow(4)
 ## forward and reverse takes speed in percentage(0-100)
 
 try:
-        m1.forward(100)
-        m2.forward(100)
-        m3.forward(100)
-        m4.forward(100)
+        while True:
+                for i in range(10):
+                        motorAll.forward(10*i)
+                        time.sleep(0.1)
+                for i in range(10, 0, -1)
+                        motorAll.forward(10*i)
+                        time.sleep(0.1)
+                for i in range(10):
+                        motorAll.reverse(10*i)
+                        time.sleep(0.1)
+                for i in range(10, 0, -1)
+                        motorAll.reverse(10*i)
+                        time.sleep(0.1)
+                time.sleep(2)
         '''
         while True:
 #-----------To Drive the Motors Forward------------# 
