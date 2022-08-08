@@ -1,5 +1,6 @@
 import rospy
 from std_msgs.msg import Float32MultiArray
+import mec_control_no_gui
 
 
 class CoordinateSubscriber:

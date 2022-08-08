@@ -2,7 +2,7 @@
 # A controller that combines an LQR for steering with PID speed control for optimal path tracking.
 # The LQR's control policy is found using SciPy's solver for the discrete-time algebraic Riccati equation.
 # The PID is provided by the simple-pid python package, and the setpoint of the speed adjusts for turn angles. 
-# This controller is intended for 4-wheel mecanum drive systems.
+# This controller is intended for 4-wheel mecanu drive systems.
 
 # INSTRUCTIONS
 # Initialize LQR_PID object with the wheel radius, width, height, and desired maximum velocity.
@@ -15,6 +15,7 @@ from scipy import linalg as la
 from simple_pid import PID
 import numpy as np
 import time
+import control
 
 
 class LQR_PID:
@@ -27,46 +28,69 @@ class LQR_PID:
         self.max_V = v             # mm/s
         self.speed_control = spd_ctrl
         self.time_step = 0.1       # s
-        self.K1 = self.K_matrix()
+
+
+    def solve_DARE(self, A, B, Q, R):
+        N = 100
+        P = [None] * (N + 1)
+        Qf = Q
+        P[N] = Qf
+        for i in range(N, 0, -1):
+            P[i-1] = Q + A.T @ P[i] @ A - (A.T @ P[i] @ B) @ np.linalg.pinv(
+                R + B.T @ P[i] @ B) @ (B.T @ P[i] @ A)      
+        return P, N
 
 
     # The solution to the optimal control policy u = K*x
-    def K_matrix(self):
-        A = np.eye(3)
-        B = self.time_step*np.eye(3)
-        Q = 1 * np.array([
+    def K_matrix(self, theta):
+        self.A = np.eye(3)
+        self.B = self.time_step * np.array([
+                [np.cos(theta), 0],
+                [np.sin(theta), 0],
+                [0,             1]
+            ])
+        self.Q = 1 * np.array([
             [1, 0, 0],
             [0, 1, 0],
-            [0, 0, 1]
+            [0, 0, 0.01]
             ])
         #R punishes actuation
-        R = 0.1 * np.array([
-            [1, 0, 0],
-            [0, 1, 0],
-            [0, 0, 1]
+        self.R = 1 * np.array([
+            [0.000000001, 0],
+            [0, 1]
             ])
 
         self.A1 = np.block([
-            [A,                       B],
-            [np.zeros((3,3)), np.eye(3)]
+            [self.A,                       self.B],
+            [np.zeros((2,3)), np.eye(2)]
             ])
         self.B1 = np.block([
-            [B        ],
-            [np.eye(3)]
+            [self.B        ],
+            [np.eye(2)]
             ])
-        Q1 = np.block([
-            [Q,         np.zeros((3,3))],
-            [np.zeros((3,3)),         R]
+        self.Q1 = np.block([
+            [self.Q,         np.zeros((3,2))],
+            [np.zeros((2,3)),         self.R]
             ])
         #R1 punishes turning
-        self.R1 = 4 * np.array([
-            [1, 0, 0],
-            [0, 1, 0],
-            [0, 0, 1]
+        self.R1 = 1 * np.array([
+            [1, 0],
+            [0, 1]
             ])
+        '''
+        P = la.solve_discrete_are(self.A1, self.B1, self.Q1, self.R1)
+        #P = control.dare(self.A1, self.B1, self.Q1, self.R1)[0]
+        print(np.shape(self.B1.T))
+        print('P: ' + str(P))
+        K1 = la.inv(R1) @ self.B1.T @ P
+        '''
+        P, N = self.solve_DARE(self.A, self.B, self.Q, self.R)
+        K = [None] * N
+        for i in range(N):
+            K[i] = -np.linalg.pinv(self.R + self.B.T @ P[i+1] @ self.B) @ self.B.T @ P[i+1] @ self.A
 
-        P = la.solve_discrete_are(self.A1, self.B1, Q1, self.R1)
-        K1 = la.inv(self.R1) @ self.B1.T @ P
+        K1 = K[N-1]
+        
         return K1
 
 
@@ -97,35 +121,45 @@ class LQR_PID:
 
     # Calculates u, inputs the pid speed, and calculates the next state A*x - B*u
     def lqr_steer(self, path_pos, pos, vel, spd):
+        #vel[0] = spd
+        print('path : ' + str(path_pos))
+        print('curr angle: ' + str(pos[2]))
+
         error = path_pos - pos
+        theta = error[2]
+        '''
         state = np.block([error, vel])
-        U = self.K1 @ state
-        nxt_state = (self.A1 @ state) - (self.B1 @ U)
-
-        nxt_err, nxt_vel = np.split(nxt_state, 2)
+        theta = state[2]
+        '''
+        K = self.K_matrix(theta)
+        U =  -K @ error
+        #U[0] = vel[0] - spd
+        print('U: ' + str(U))
+       
+        nxt_state = (self.A @ error) - (self.B @ U)
+        nxt_state = np.split(nxt_state, [3,5])
+        
+        nxt_pos = path_pos - nxt_state
+        nxt_vel = np.array([0,0])
+        '''
+        nxt_err = nxt_state[0]
+        nxt_vel = nxt_state[1]
+        print('spd and angular vel: ' + str(nxt_vel))
+        #nxt_vel[0] = spd
+        
         nxt_pos = path_pos - nxt_err
-        nxt_vel = spd * nxt_vel / np.sqrt(np.einsum('...i,...i', nxt_vel, nxt_vel))
-        nxt_spd = np.sqrt(np.einsum('...i,...i', nxt_vel, nxt_vel))
-
-        print('spd:' + str(nxt_spd))
-        print('vel:' + str(nxt_vel))
+        #print('spd:' + str(nxt_spd))
+        #print('vel: ' + str(nxt_vel))
+        print('pos: ' + str(nxt_pos))
+        print()
+        #print('path: ' + str(path_pos))
+        '''
         return nxt_pos, nxt_vel
 
 
-    # Uses inverse kinematics to calculate the angular velocity of each wheel
+    # Uses differential drive kinematics to calculate the angular velocity of each wheel
     def motor_spds(self, vel):
-        kinematics = np.array([
-            [1, -1, -(self.center_X + self.center_Y)],
-            [1,  1,  (self.center_X + self.center_Y)],
-            [1,  1, -(self.center_X + self.center_Y)],
-            [1, -1,  (self.center_X + self.center_Y)]
-            ])
-
-        ang_vel = (1/self.wheel_radius) * kinematics @ vel
-        print('motor speeds: ' + str(ang_vel))
-        print()
-        return ang_vel
-
+        return 0
 
     # Adds angles between (x,y) waypoints to be used for steering
     def gen_path(self, waypoints):
@@ -184,7 +218,7 @@ class LQR_PID:
         pid.output_limits = (0, self.max_V)
         
         pos = path[0] 
-        vel = np.array([0, 0, 0])   
+        vel = np.array([0, 0])   
         horizon = 7
 
         for i in range (np.size(path, 0) - horizon):
@@ -196,15 +230,17 @@ class LQR_PID:
 
             while True:
                 error = wp - pos
-                error_mag = np.sqrt(np.einsum('i,i', error, error))
-                error_lim = 50 #10.75*self.R1[0][0] + 0.2275*self.max_V - 45
+                
+                xy_error = np.array([
+                    error[0], error[1]
+                    ])
+                error_mag = np.sqrt(np.einsum('i,i', xy_error, xy_error))
+                error_lim = 30 #10.75*self.R1[0][0] + 0.2275*self.max_V - 45
             	# IMPORTANT: if error limit is too small, infinite oscillation occurs
                 if error_mag > error_lim:
                     net_turn = path[i+horizon][2] - path[i][2]
                     spd = self.pid_speed(pid, net_turn, spd)
-
                     pos, vel = self.lqr_steer(wp, pos, vel, spd)
-                    ang_spds = self.motor_spds(vel)
 
                     self.plot_path(ax1, fig, bg, pos)
                     time.sleep(0.03)
@@ -240,11 +276,11 @@ def lissajous(size, num_points):
 if __name__ == "__main__":
     # wheel radius, width, height, and max velocity in terms of mm and s
     # to disable speed control (constant speed), enter False
-    controller = LQR_PID(radius=64.5, width=46.5, height=93.0, v=300.0, spd_ctrl=True)
+    controller = LQR_PID(radius=64.5, width=46.5, height=93.0, v=300.0, spd_ctrl=False)
     # make sure path has points in the form of (x,y) or (x,y,theta)
     size = 1000
     num_points = 1000
-    waypoints = lissajous(size, num_points)
+    waypoints = sine_wave(size, num_points)
     # if points are (x,y) then run it through gen_path
     path = controller.gen_path(waypoints)
     controller.path_tracking(path)
