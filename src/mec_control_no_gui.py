@@ -25,10 +25,39 @@ class LQR_PID:
         self.max_V = v             # mm/s
         self.speed_control = spd_ctrl
         self.time_step = 0.1       # s
+        
+        self.pid = PID(0.04, 0.0, 0.0, setpoint = 90*self.max_V)
+        self.pid.output_limits = (0, self.max_V)
         self.K1 = self.K_matrix()
 
 
-    # The solution to the optimal control policy u = K*x
+    # Continuously adjusts the setpoint of the pid based on turn angles in the horizon
+    def pid_speed(self, pid, net_turn, curr_spd):
+        if self.speed_control:
+            if np.cos(net_turn) >= 0:
+                    cost = abs(0.5*np.sin(net_turn))
+            elif np.cos(net_turn) < 0:
+                    cost = abs(0.5 - 0.5*np.cos(net_turn)) 
+
+            ideal_spd = 90*self.max_V*((1 - cost)**8)
+            pid.setpoint = ideal_spd
+            
+            if (curr_spd > 0.2*self.max_V) & (ideal_spd > 0.2*90*self.max_V):
+                pid.reset()
+                pid.tunings = (0.01, 0.0, 0.00)
+            elif (curr_spd < 0.2*self.max_V) & (ideal_spd > 0.2*90*self.max_V):
+                pid.reset()
+                pid.tunings = (0.01, 0.005, 0.0)
+
+            nxt_spd = pid(curr_spd, self.time_step)
+            print('spd:' + str(nxt_spd))
+            return nxt_spd
+        else:
+            nxt_spd = self.max_V
+            return nxt_spd
+
+
+ # The solution to the optimal control policy u = K*x
     def K_matrix(self):
         A = np.eye(3)
         B = self.time_step*np.eye(3)
@@ -57,55 +86,33 @@ class LQR_PID:
             [np.zeros((3,3)),         R]
             ])
         #R1 punishes turning
-        self.R1 = 4 * np.array([
+        R1 = 4 * np.array([
             [1, 0, 0],
             [0, 1, 0],
             [0, 0, 1]
             ])
 
-        P = la.solve_discrete_are(self.A1, self.B1, Q1, self.R1)
-        K1 = la.inv(self.R1) @ self.B1.T @ P
+        P = la.solve_discrete_are(self.A1, self.B1, Q1, R1)
+        K1 = la.inv(R1) @ self.B1.T @ P
         return K1
-
-
-    # Continuously adjusts the setpoint of the pid based on turn angles in the horizon
-    def pid_speed(self, pid, net_turn, curr_spd):
-        if self.speed_control:
-            if np.cos(net_turn) >= 0:
-                    cost = abs(0.5*np.sin(net_turn))
-            elif np.cos(net_turn) < 0:
-                    cost = abs(0.5 - 0.5*np.cos(net_turn)) 
-
-            ideal_spd = 90*self.max_V*((1 - cost)**8)
-            pid.setpoint = ideal_spd
-            
-            if (curr_spd > 0.2*self.max_V) & (ideal_spd > 0.2*90*self.max_V):
-                pid.reset()
-                pid.tunings = (0.01, 0.0, 0.00)
-            elif (curr_spd < 0.2*self.max_V) & (ideal_spd > 0.2*90*self.max_V):
-                pid.reset()
-                pid.tunings = (0.01, 0.005, 0.0)
-
-            nxt_spd = pid(curr_spd, self.time_step)
-            return nxt_spd
-        else:
-            nxt_spd = self.max_V
-            return nxt_spd
 
 
     # Calculates u, inputs the pid speed, and calculates the next state A*x - B*u
     def lqr_steer(self, path_pos, pos, vel, spd):
         error = path_pos - pos
         state = np.block([error, vel])
+
+        self.K1 = self.K_matrix()
         U = self.K1 @ state
         nxt_state = (self.A1 @ state) - (self.B1 @ U)
 
         nxt_err, nxt_vel = np.split(nxt_state, 2)
         nxt_pos = path_pos - nxt_err
-        nxt_vel = spd * nxt_vel / np.sqrt(np.einsum('...i,...i', nxt_vel, nxt_vel))
-        nxt_spd = np.sqrt(np.einsum('...i,...i', nxt_vel, nxt_vel))
 
-        print('spd:' + str(nxt_spd))
+        xy_vel = np.array([nxt_vel[0], nxt_vel[1]])
+        xy_vel = spd * xy_vel / np.sqrt(np.einsum('...i,...i', xy_vel, xy_vel))
+        nxt_vel = np.block([xy_vel, nxt_vel[2]])
+
         print('vel:' + str(nxt_vel))
         return nxt_pos, nxt_vel
 
@@ -144,16 +151,13 @@ class LQR_PID:
 
     # increase prediction horizon to decelerate earlier
     def path_tracking(self, path):
-        pid = PID(0.04, 0.0, 0.0, setpoint = 90*self.max_V)
-        pid.output_limits = (0, self.max_V)
-        
         pos = path[0] 
         vel = np.array([0, 0, 0])   
-        horizon = 7
+        horizon = 6
 
-        for i in range (np.size(path, 0) - horizon):
+        for i in range (np.size(path, 0)):
             if np.size(path, 0) - i < horizon:
-        	    horizon = np.size(path, 0) - i
+        	    horizon = np.size(path, 0) - i - 1
 
             wp = path[i]
             spd = 0
@@ -166,15 +170,17 @@ class LQR_PID:
             	# IMPORTANT: if error limit is too small, infinite oscillation occurs
                 if error_mag > error_lim:
                     net_turn = path[i+horizon][2] - path[i][2]
-                    spd = self.pid_speed(pid, net_turn, spd)
+                    spd = self.pid_speed(self.pid, net_turn, spd)
 
                     pos, vel = self.lqr_steer(wp, pos, vel, spd)
                     ang_spds = self.motor_spds(vel)
 
                     time.sleep(0.09)
                     et = time.time()
+                    self.time_step = et - st
                     print('runtime per loop: ' + str(et - st))
                     print()
+
                 else:
                     break
 
@@ -211,7 +217,7 @@ if __name__ == "__main__":
     # make sure path has points in the form of (x,y) or (x,y,theta)
     size = 1000
     num_points = 1000
-    waypoints = lissajous(size, num_points)
+    waypoints = circle(size, num_points)
     # if points are (x,y) then run it through gen_path
     path = controller.gen_path(waypoints)
     controller.path_tracking(path)

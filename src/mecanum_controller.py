@@ -27,6 +27,9 @@ class LQR_PID:
         self.max_V = v             # mm/s
         self.speed_control = spd_ctrl
         self.time_step = 0.1       # s
+
+        self.pid = PID(0.04, 0.0, 0.0, setpoint = 90*self.max_V)
+        self.pid.output_limits = (0, self.max_V)
         self.K1 = self.K_matrix()
 
 
@@ -182,16 +185,14 @@ class LQR_PID:
     # increase prediction horizon to decelerate earlier
     def path_tracking(self, path):
         ax1, fig, bg = self.init_plot(path)
-        pid = PID(0.04, 0.0, 0.0, setpoint = 90*self.max_V)
-        pid.output_limits = (0, self.max_V)
         
         pos = path[0] 
         vel = np.array([0, 0, 0])   
         horizon = 6
 
-        for i in range (np.size(path, 0) - horizon):
+        for i in range (np.size(path, 0)):
             if np.size(path, 0) - i < horizon:
-        	    horizon = np.size(path, 0) - i
+        	    horizon = np.size(path, 0) - i - 1
 
             wp = path[i]
             spd = 0
@@ -203,7 +204,7 @@ class LQR_PID:
             	# IMPORTANT: if error limit is too small, infinite oscillation occurs
                 if error_mag > error_lim:
                     net_turn = path[i+horizon][2] - path[i][2]
-                    spd = self.pid_speed(pid, net_turn, spd)
+                    spd = self.pid_speed(self.pid, net_turn, spd)
 
                     pos, vel = self.lqr_steer(wp, pos, vel, spd)
                     ang_spds = self.motor_spds(vel)
