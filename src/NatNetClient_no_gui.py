@@ -18,7 +18,7 @@ DoubleValue = struct.Struct('<d')
 
 class NatNetClient:
 
-    def __init__(self, conn):
+    def __init__(self):
         # Change this value to the IP address of the NatNet server.
         self.serverIPAddress = "128.200.3.89"
 
@@ -47,8 +47,6 @@ class NatNetClient:
         # initialize ROS publisher object
         self.publisher = coord_pub.CoordinatePublisher()
 
-        #add multiprocessing pipe connection
-        self.conn = conn
 
     # Client/server message ids
     NAT_PING = 0
@@ -106,7 +104,7 @@ class NatNetClient:
         # Send information to any listener.
         if self.rigidBodyListener is not None:
             # if self.ts%1<0.001:
-            self.rigidBodyListener(self.conn, self.publisher, id, pos, rot)
+            self.rigidBodyListener(self.publisher, id, pos, rot)
 
         # RB Marker Data ( Before version 3.0.  After Version 3.0 Marker data is in description )
         if(self.__natNetStreamVersion[0] < 3 and self.__natNetStreamVersion[0] != 0):
