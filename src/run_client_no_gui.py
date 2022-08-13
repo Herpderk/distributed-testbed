@@ -15,7 +15,6 @@ def receiveMoCapFrame(frameNumber, markerSetCount, unlabeledMarkersCount, rigidB
 def receiveRigidBodyFrame(publisher, id, position, rotation):
     print("pos of robot", id, " ", position, "\n ")
     publisher.publish(id, position)
-    time.sleep(0.03)
 
 
 if __name__ == '__main__':

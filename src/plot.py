@@ -1,3 +1,5 @@
+import matplotlib
+matplotlib.use('Qt5Agg', force=True)
 import matplotlib.pyplot as plt
 import numpy as np
 import random
@@ -7,6 +9,7 @@ import time
 class Plot_3D:
 
     def __init__(self):
+        
         # dimensions of 3d space in mm
         self.x_length = 3
         self.y_length = 3
