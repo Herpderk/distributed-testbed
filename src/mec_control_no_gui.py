@@ -13,6 +13,8 @@ from scipy import linalg as la
 from simple_pid import PID
 import numpy as np
 import time
+import PiMotor
+import RPi.GPIO as GPIO
 
 
 class LQR_PID:
@@ -29,6 +31,11 @@ class LQR_PID:
         self.pid = PID(0.04, 0.0, 0.0, setpoint = 90*self.max_V)
         self.pid.output_limits = (0, self.max_V)
         self.K1 = self.K_matrix()
+
+        self.m1 = PiMotor.Motor("MOTOR1",1)
+        self.m2 = PiMotor.Motor("MOTOR2",1)
+        self.m3 = PiMotor.Motor("MOTOR3",1)
+        self.m4 = PiMotor.Motor("MOTOR4",1)
 
 
     # Continuously adjusts the setpoint of the pid based on turn angles in the horizon
@@ -131,6 +138,11 @@ class LQR_PID:
         frontR = ang_vel[1]
         backL = ang_vel[2]
         backR = ang_vel[3]
+
+        #self.m1.forward or reverse
+        #self.m2.forward or reverse
+        #self.m3.forward or reverse
+        #self.m4.forward or reverse
         
         print('motor speeds: ' + str(ang_vel))
         return ang_vel

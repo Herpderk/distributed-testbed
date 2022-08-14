@@ -247,7 +247,7 @@ if __name__ == "__main__":
     # make sure path has points in the form of (x,y) or (x,y,theta)
     size = 1000
     num_points = 1000
-    waypoints = circle(size, num_points)
+    waypoints = lissajous(size, num_points)
     # if points are (x,y) then run it through gen_path
     path = controller.gen_path(waypoints)
     controller.path_tracking(path)

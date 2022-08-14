@@ -36,6 +36,8 @@ try:
                 for i in range(10, 0, -1):
                         motorAll.reverse(10*i)
                         time.sleep(0.1)
+                motor.forward(0.1)
+                time.sleep(0.01)
                 time.sleep(2)
         '''
         while True:
