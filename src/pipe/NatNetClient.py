@@ -18,7 +18,7 @@ DoubleValue = struct.Struct('<d')
 
 class NatNetClient:
 
-    def __init__(self, lifo):
+    def __init__(self, conn):
         # Change this value to the IP address of the NatNet server.
         self.serverIPAddress = "128.200.3.89"
 
@@ -46,10 +46,10 @@ class NatNetClient:
 
         # initialize ROS publisher object
         self.publisher = coord_pub.CoordinatePublisher()
+        # pipe connection
+        self.conn = conn
         # start internal timer to correctly time publishes
         self.st = time.time()
-        # add pseudo multiprocessing lifo queue
-        self.lifo = lifo
         
 
     # Client/server message ids
@@ -108,11 +108,11 @@ class NatNetClient:
         # Send information to any listener.
         if self.rigidBodyListener is not None:
             # take the difference between the current time and previous saved time
-            dt = time.time() - self.st
-            self.rigidBodyListener(self.lifo, dt, self.publisher, id, pos, rot)
+            #dt = time.time() - self.st
+            self.rigidBodyListener(self.conn, self.publisher, id, pos, rot)
             # update the saved time 
-            if dt >= 0.1:
-                self.st = time.time()
+            #if dt >= 0.1:
+            #    self.st = time.time()
 
 
         # RB Marker Data ( Before version 3.0.  After Version 3.0 Marker data is in description )

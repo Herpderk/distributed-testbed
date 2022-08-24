@@ -1,6 +1,6 @@
 import multiprocessing
-import NatNetClient
-import plot
+from NatNetClient import NatNetClient
+from live_plot import Live_Plot
 import coord_pub
 import numpy as np
 import time
@@ -13,7 +13,7 @@ def receiveMoCapFrame(frameNumber, markerSetCount, unlabeledMarkersCount, rigidB
 
 # callback function for rigid body frame
 def receiveRigidBodyFrame(conn, publisher, id, position, rotation ):
-    time.sleep(0.03)
+    #time.sleep(0.03)
     #print("pos of robot", id, " ", position, "\n ")
     publisher.publish(id, position)
     conn.send(np.array([id, position]))
@@ -21,7 +21,7 @@ def receiveRigidBodyFrame(conn, publisher, id, position, rotation ):
 
 def sending(conn):
     # Initialize client object
-    streamingClient = NatNetClient.NatNetClient(conn)
+    streamingClient = NatNetClient(conn)
     # Set client to read motion capture frames (we won't be using this for now)
     streamingClient.newFrameListener = receiveMoCapFrame
     # Set client to read rigid body frames
@@ -30,7 +30,7 @@ def sending(conn):
     streamingClient.run()
 
 def plotting(conn):
-    new_plot = plot.Plot_3D()
+    new_plot = Live_Plot()
     while True:
         st = time.time()
         list = conn.recv()

@@ -2,7 +2,7 @@ from multiprocess import Process
 from multiprocess import Manager
 #from multiprocessing import Process
 import NatNetClient
-import plot
+from live_plot import Live_Plot
 import coord_pub
 import time
 
@@ -14,12 +14,13 @@ def receiveMoCapFrame(frameNumber, markerSetCount, unlabeledMarkersCount, rigidB
 
 # callback function for rigid body frame
 def receiveRigidBodyFrame(lifo, timer, publisher, id, position, rotation ):
-    print(type(position))
     lifo[id].append(position)
+    #print('LIFO ID:' + str(lifo[id]))
     if timer >= 0.1:
         publisher.publish(id, position)
         if id == 0:
-            print('TIME: ' + str(time.time()))
+            pass
+            #print('TIME: ' + str(time.time()))
 
     
 
@@ -34,15 +35,18 @@ def tracking(lifo):
     streamingClient.run()
 
 
-def plotting(lifo, new_plot):
+def plotting(lifo):
+    new_plot = Live_Plot()
     while True:
         #st = time.time()
-        if len(lifo) > 0:
-            for id in range(len(lifo)):
+        for id in range(len(lifo)):
+            if len(lifo[id]) > 0:
                 arr = lifo.pop()
+                #print(arr)
                 del lifo[id][:]
-                print('ARRAY AFTER DELETION: ' + str(lifo[id]))
+                #print('ARRAY AFTER DELETION: ' + str(lifo[id]))
                 pos = arr[0]
+                print('pos: ' + str(pos))
 
                 if id == 0:
                     print('PLOTTING: ' + str(pos))
@@ -54,18 +58,20 @@ if __name__ == '__main__':
     manager = Manager()
     fake_lifo = manager.list()
 
-    new_plot = plot.Plot_3D()
-    n = new_plot.num_robots
-    for i in range(n):
-        fake_lifo.append([])
+    plot = Live_Plot()
+    fake_lifo = [ [ [] for i in range(1) ] for i in range(plot.num_robots) ]
+    print('PSEUDO LIFO: ' + str(fake_lifo))
+    for i in range(plot.num_robots):
+        fake_lifo[i][0] = [0,0,0]
 
     
     # creating new processes
     track_process = Process(target=tracking, args=[fake_lifo])
-    plot_process = Process(target=plotting, args=[fake_lifo, new_plot])
+    plot_process = Process(target=plotting, args=[fake_lifo])
   
     # running processes
     track_process.start()
+    time.sleep(0.5)
     plot_process.start()
     
     # wait until processes finish
