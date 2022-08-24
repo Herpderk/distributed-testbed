@@ -1,48 +1,42 @@
 import matplotlib
-matplotlib.use('Qt5Agg', force=True)
+matplotlib.use('Qt5Agg')
 import matplotlib.pyplot as plt
 import numpy as np
 import random
 import time
 
 
-class Plot_3D:
+class Live_Plot:
 
     def __init__(self):
+        self.x_dim = 3 #mm
+        self.y_dim = 3 #mm
+        self.z_dim = 3 #mm
+        # colors and number of robots, index is the id
+        self.tracker_colors = np.array([
+            'rP', 'gP', 'bP'
+        ])
+        self.num_robots = len(self.tracker_colors)
+        # labels for each robot
+        self.labels = np.empty(self.num_robots, dtype=str)
+        for i in range(self.num_robots):
+            self.labels[i] = ('robot' + str(i))
         
-        # dimensions of 3d space in mm
-        self.x_length = 3
-        self.y_length = 3
-        self.z_length = 3
-        # number of robots to track
-        self.num_robots = 3
         self.x_coords = np.zeros(self.num_robots)
         self.y_coords = np.zeros(self.num_robots)
         self.z_coords = np.zeros(self.num_robots)
-        # colors to identify each robot
-        self.tracker_colors = {
-            0: 'rP',
-            1: 'gP',
-            2: 'bP'
-        }
-        self.colors = []
-        for i in range(self.num_robots):
-            self.colors.append(self.tracker_colors[i])
-        # labels for each robot
-        self.labels = []
-        for i in range(self.num_robots):
-            self.labels.append('robot' + str(i))
-        # initialize figures
         '''
         plt.ion()
         fig = plt.figure(figsize=(12, 5))
         self.ax1 = fig.add_subplot(1, 2, 1, projection='3d')
         self.ax2 = fig.add_subplot(1, 2, 2)
         '''
+        self.init_plot()
 
+    def init_plot(self):
         self.fig, self.ax1 = plt.subplots(figsize=(8, 7))
-        self.ax1.set_xlim(-self.x_length, self.x_length)
-        self.ax1.set_ylim(-self.y_length, self.y_length)
+        self.ax1.set_xlim(-self.x_dim, self.x_dim)
+        self.ax1.set_ylim(-self.y_dim, self.y_dim)
 
         plt.show(block = False)
         plt.pause(0.1)
@@ -61,8 +55,8 @@ class Plot_3D:
         for i in range(self.num_robots):
             (pt,) = self.ax1.plot(self.x_coords[i], self.y_coords[i], self.tracker_colors[i], markersize=5, label="robot" + str(i))
             pt.set_data(self.x_coords[i], self.y_coords[i])
-            self.ax1.set_xlim(-self.x_length, self.x_length)
-            self.ax1.set_ylim(-self.y_length, self.y_length)
+            self.ax1.set_xlim(-self.x_dim, self.x_dim)
+            self.ax1.set_ylim(-self.y_dim, self.y_dim)
             self.ax1.draw_artist(pt)    
         # animation stuff
         self.fig.canvas.blit(self.fig.bbox)
@@ -72,9 +66,9 @@ class Plot_3D:
         self.ax1.clear()
         self.ax1.scatter3D(self.x_coords, self.y_coords, self.z_coords, c=self.colors)
         # set axis limits
-        self.ax1.set_xlim(0, self.x_length)
-        self.ax1.set_ylim(0, self.y_length)
-        self.ax1.set_zlim(0, self.z_length)
+        self.ax1.set_xlim(0, self.x_dim)
+        self.ax1.set_ylim(0, self.y_dim)
+        self.ax1.set_zlim(0, self.z_dim)
         # annotate points
         for i in range(self.num_robots):
             self.ax1.text(
@@ -83,8 +77,8 @@ class Plot_3D:
         self.ax2.clear()
         self.ax2.scatter(self.x_coords, self.y_coords, c=self.colors)
 
-        self.ax2.set_xlim(0, self.x_length)
-        self.ax2.set_ylim(0, self.y_length)
+        self.ax2.set_xlim(0, self.x_dim)
+        self.ax2.set_ylim(0, self.y_dim)
         for i, label in enumerate(self.labels):
             self.ax2.annotate(label, (self.x_coords[i], self.y_coords[i]))
 
@@ -95,7 +89,7 @@ class Plot_3D:
 
 
 if __name__ == '__main__':
-    new_plot = Plot_3D()
+    new_plot = Live_Plot()
     while True:
         for i in range(3):
             new_plot.update(i, np.array([random.randrange(0, 2, 1),
