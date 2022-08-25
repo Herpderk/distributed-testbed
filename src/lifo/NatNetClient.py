@@ -2,7 +2,7 @@ import socket
 import struct
 from threading import Thread
 import time
-import coord_pub
+from coord_pub import CoordinatePublisher
 
 
 def trace(*args):
@@ -18,7 +18,7 @@ DoubleValue = struct.Struct('<d')
 
 class NatNetClient:
 
-    def __init__(self, lifo):
+    def __init__(self, Qs, publisher):
         # Change this value to the IP address of the NatNet server.
         self.serverIPAddress = "128.200.3.89"
 
@@ -45,9 +45,9 @@ class NatNetClient:
         self.ts = 0.0
 
         # initialize ROS publisher object
-        self.publisher = coord_pub.CoordinatePublisher()
-        # pipe connection
-        self.lifo = lifo
+        self.publisher = publisher
+        #tuple of queues
+        self.Qs = Qs
         # start internal timer to correctly time publishes
         self.st = time.time()
         
@@ -108,11 +108,11 @@ class NatNetClient:
         # Send information to any listener.
         if self.rigidBodyListener is not None:
             # take the difference between the current time and previous saved time
-            dt = time.time() - self.st
-            self.rigidBodyListener(self.lifo, dt, self.publisher, id, pos, rot)
+            #dt = time.time() - self.st
+            self.rigidBodyListener(self.Qs, self.publisher, id, pos, rot)
             # update the saved time 
-            if dt >= 0.1:
-                self.st = time.time()
+            #if dt >= 0.1:
+            #    self.st = time.time()
 
 
         # RB Marker Data ( Before version 3.0.  After Version 3.0 Marker data is in description )

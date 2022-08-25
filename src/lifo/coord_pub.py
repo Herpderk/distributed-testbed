@@ -4,14 +4,16 @@ from std_msgs.msg import Float32MultiArray
 
 class CoordinatePublisher:
 
-    def __init__(self):
+
+    def __init__(self, num_robots):
         # initialize node
         rospy.init_node('coordinate_publisher')
         # input the ids of each tracker
-        tracker_ids = [0, 1, 2]
+        self.tracker_ids = range(num_robots)
         for i in tracker_ids:
             self.pub = rospy.Publisher(
                 "robot" + str(i), Float32MultiArray, queue_size=100)
+
 
     def publish(self, id, coordinate):
         # switch publisher to appropriate topic

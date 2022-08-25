@@ -1,10 +1,12 @@
-from multiprocess import Process 
-from multiprocess import Manager
-#from multiprocessing import Process
-import NatNetClient
-from live_plot import Live_Plot
-import coord_pub
+from multiprocess import Process, Manager
+from multiprocess.managers import BaseManager
+from NatNetClient import NatNetClient
+from queue import LifoQueue
+from live_plot import LivePlot
+from coord_pub import CoordinatePublisher
+import numpy as np  
 import time
+
 
 # callback function for motion capture frame
 def receiveMoCapFrame(frameNumber, markerSetCount, unlabeledMarkersCount, rigidBodyCount, skeletonCount,
@@ -13,69 +15,92 @@ def receiveMoCapFrame(frameNumber, markerSetCount, unlabeledMarkersCount, rigidB
 
 
 # callback function for rigid body frame
-def receiveRigidBodyFrame(lifo, timer, publisher, id, position, rotation ):
-    lifo[id].append(position)
+def receiveRigidBodyFrame(Qs, publisher, id, position, rotation):
+    pos = np.asarray(position)
+    Qs[id].put(pos)
     #print('LIFO ID:' + str(lifo[id]))
-    if timer >= 0.1:
+    #if timer >= 0.1:
         publisher.publish(id, position)
-        if id == 0:
-            pass
+        #if id == 0:
             #print('TIME: ' + str(time.time()))
 
     
+def tracking(Qs, publisher):
+    try:
+        # Initialize client object
+        streamingClient = NatNetClient.NatNetClient(Qs, publisher)
+        # Set client to read frames
+        streamingClient.newFrameListener = receiveMoCapFrame
+        streamingClient.rigidBodyListener = receiveRigidBodyFrame
+        # Run client
+        streamingClient.run()
+    except KeyboardInterrupt:
+        print('interrupted!')
 
-def tracking(lifo):
-    # Initialize client object
-    streamingClient = NatNetClient.NatNetClient(lifo)
-    # Set client to read motion capture frames (we won't be using this for now)
-    streamingClient.newFrameListener = receiveMoCapFrame
-    # Set client to read rigid body frames
-    streamingClient.rigidBodyListener = receiveRigidBodyFrame
-    # Run client
-    streamingClient.run()
 
-
-def plotting(lifo):
-    new_plot = Live_Plot()
-    while True:
-        #st = time.time()
-        for id in range(len(lifo)):
-            if len(lifo[id]) > 0:
-                arr = lifo.pop()
-                #print(arr)
-                del lifo[id][:]
-                #print('ARRAY AFTER DELETION: ' + str(lifo[id]))
-                pos = arr[0]
-                print('pos: ' + str(pos))
-
-                if id == 0:
-                    print('PLOTTING: ' + str(pos))
-                new_plot.update(id , pos)
+def plotting(Qs):
+    new_plot = LivePlot()
+    try:
+        while True:
+            #st = time.time()
+            for id in range(len(Qs)):
+                #print(lifo[id])
+                if Qs[id].qsize() > 0:
+                    st = time.time()
+                    pos = Qs[id].get()
+                    new_plot.update(id , pos)
+                    clear_q(Qs[id])
+                    et = time.time()
+                    print('time-interval' + str(et - st))
+                    #print('pos: ' + str(pos))
+    except KeyboardInterrupt:
+        print('interrupted!')
         
-  
+
+def clear_q(queue):
+    while not queue.empty():
+        try:
+            queue.get(False)
+        except Empty:
+            continue
+        queue.task_done()
+
+
+class MyManager(BaseManager):
+    pass
+MyManager.register('LifoQueue', LifoQueue)
+
 
 if __name__ == '__main__':
-    manager = Manager()
-    fake_lifo = manager.list()
+    # initialize manager
+    manager = MyManager()
+    manager.start()
 
+    # get number of robots from temporary plot and create n lifo queues
     plot = Live_Plot()
-    fake_lifo = [ [ [] for i in range(1) ] for i in range(plot.num_robots) ]
-    print('PSEUDO LIFO: ' + str(fake_lifo))
-    for i in range(plot.num_robots):
-        fake_lifo[i][0] = [0,0,0]
+    plot.close()
+    n = plot.num_robots
 
+    # tuple of LifoQueues
+    Qs = ()
+    for id in range(n):
+        locals()['lifo' + str(id)] = manager.LifoQueue(maxsize=10)
+        Qs = Qs + (locals()['lifo' + str(id)],)
+    print(Qs)
+
+    #initialize coord publisher
+    publisher = CoordinatePublisher(n)
     
-    # creating new processes
-    track_process = Process(target=tracking, args=[fake_lifo])
-    plot_process = Process(target=plotting, args=[fake_lifo])
+    # create new processes
+    track_process = Process(target=tracking, args=(Qs, publisher))
+    plot_process = Process(target=plotting, args=(Qs))
   
-    # running processes
+    # run processes
     track_process.start()
-    time.sleep(0.5)
     plot_process.start()
     
     # wait until processes finish
     track_process.join()
     plot_process.join()
-    
+    manager.shutdown()
     
