@@ -2,7 +2,7 @@ import rospy
 from std_msgs.msg import Float32MultiArray
 import ros_np_multiarray as rnm
 import numpy as np
-import mec_control_no_gui
+from mec_control_no_gui import LQR_PID
 
 
 class CoordinateSubscriber:
