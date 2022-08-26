@@ -1,9 +1,8 @@
-from multiprocess import Process, Manager
+from multiprocess import Process
 from multiprocess.managers import BaseManager
-from NatNetClient import NatNetClient
 from queue import LifoQueue
+from NatNetClient import NatNetClient
 from live_plot import LivePlot
-from coord_pub import CoordinatePublisher
 import numpy as np  
 import time
 
@@ -18,17 +17,16 @@ def receiveMoCapFrame(frameNumber, markerSetCount, unlabeledMarkersCount, rigidB
 def receiveRigidBodyFrame(Qs, publisher, id, position, rotation):
     pos = np.asarray(position)
     Qs[id].put(pos)
-    #print('LIFO ID:' + str(lifo[id]))
     #if timer >= 0.1:
-        publisher.publish(id, position)
+    publisher.publish(id, pos)
         #if id == 0:
-            #print('TIME: ' + str(time.time()))
+        #    print('TIME: ' + str(time.time()))
 
     
 def tracking(Qs, num_robots):
     try:
         # Initialize client object
-        streamingClient = NatNetClient.NatNetClient(Qs, num_robots)
+        streamingClient = NatNetClient(Qs, num_robots)
         # Set client to read frames
         streamingClient.newFrameListener = receiveMoCapFrame
         streamingClient.rigidBodyListener = receiveRigidBodyFrame
@@ -51,8 +49,6 @@ def plotting(Qs):
                     new_plot.update(id , pos)
                     clear_q(Qs[id])
                     et = time.time()
-                    print('time-interval' + str(et - st))
-                    #print('pos: ' + str(pos))
     except KeyboardInterrupt:
         print('interrupted!')
         
@@ -77,18 +73,16 @@ if __name__ == '__main__':
     manager.start()
 
     # get number of robots from temporary plot and create n lifo queues
-    plot = Live_Plot()
+    plot = LivePlot()
     plot.close()
     n = plot.num_robots
 
     # tuple of LifoQueues
     Qs = ()
     for id in range(n):
-        locals()['lifo' + str(id)] = manager.LifoQueue(maxsize=10)
+        locals()['lifo' + str(id)] = manager.LifoQueue(maxsize=20)
         Qs = Qs + (locals()['lifo' + str(id)],)
     print(Qs)
-
-    
     
     # create new processes
     track_process = Process(target=tracking, args=(Qs, n))
