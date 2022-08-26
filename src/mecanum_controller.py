@@ -6,7 +6,7 @@
 
 # INSTRUCTIONS
 # Initialize LQR_PID object with the wheel radius, width, height, and desired maximum velocity.
-# Path must be an array of (x,y) arrays and inputted into gen_path to be usable for the controller.
+# Path must be an array of [x,y] arrays and inputted into gen_path to be usable for the controller.
 # Run path_tracking, an example can be found in main. 
 
 import matplotlib
@@ -125,9 +125,13 @@ class LQR_PID:
             [1,  1,  (self.center_X + self.center_Y)],
             [1,  1, -(self.center_X + self.center_Y)],
             [1, -1,  (self.center_X + self.center_Y)]
-            ])
-
+        ])
         ang_vel = (1/self.wheel_radius) * kinematics @ vel
+        frontL = ang_vel[0]
+        frontR = ang_vel[1]
+        backL = ang_vel[2]
+        backR = ang_vel[3]
+
         print('motor speeds: ' + str(ang_vel))
         print()
         return ang_vel

@@ -3,7 +3,7 @@ from std_msgs.msg import Float32MultiArray
 import ros_np_multiarray as rnm
 import numpy as np
 import time
-from mec_control_no_gui import LQR_PID
+from mecanum_controller import LQR_PID
 
 
 class ControllerSubscriber:
