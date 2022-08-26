@@ -28,10 +28,10 @@ class ControllerSubscriber:
 
 	def path_track(self, new_coord):
 		dt = time.time() - self.timer
-        if dt >= 0.1:
-        	self.timer = time.time()
-        	self.controller.time_step = dt
-	        #st = time.time()
+		if dt >= 0.1:
+			self.timer = time.time()
+			self.controller.time_step = dt
+			#st = time.time()
 			rospy.loginfo(str(new_coord.data))
 
 			#update current position and path
@@ -39,27 +39,25 @@ class ControllerSubscriber:
 			path = rnm.to_numpy_f32(new_coord.data[1])
 
 			#decrease horizon if nearing end of path
-	        if np.size(path, 0) - self.path_index < self.horizon:
-	        	self.horizon = np.size(path, 0) - self.path_index - 1
-	        wp = path[self.path_index]
+			if np.size(path, 0) - self.path_index < self.horizon:
+				self.horizon = np.size(path, 0) - self.path_index - 1
+			wp = path[self.path_index]
 
-	        #calc error
-	        error = wp - pos
-	        error_mag = np.sqrt(np.einsum('i,i', error, error))
+			#calc error
+			error = wp - pos
+			error_mag = np.sqrt(np.einsum('i,i', error, error))
 
-	        # perform control action if outside of acceptable error
-	        if error_mag > self.error_lim:
-	            net_turn = path[self.path_index + self.horizon][2] - path[self.path_index][2]
-	            self.spd = self.controller.pid_speed(self.controller.pid, net_turn, self.spd)
-
-	            self.vel = self.controller.lqr_steer(wp, pos, self.vel, self.spd)
-	            spin_motors = self.controller.motor_spds(self.vel)
-
-	            print('runtime per loop: ' + str(self.controller.time_step))
-	            print()
-	        # else move on to next waypoint
-	        else:
-	            self.path_index += 1
+			# perform control action if outside of acceptable error
+			if error_mag > self.error_lim:
+			    net_turn = path[self.path_index + self.horizon][2] - path[self.path_index][2]
+			    self.spd = self.controller.pid_speed(self.controller.pid, net_turn, self.spd)
+			    self.vel = self.controller.lqr_steer(wp, pos, self.vel, self.spd)
+			    spin_motors = self.controller.motor_spds(self.vel)
+			    print('runtime per loop: ' + str(self.controller.time_step))
+			    print()
+		# else move on to next waypoint
+		else:
+		    self.path_index += 1
 
 
 if __name__ == '__main__':
