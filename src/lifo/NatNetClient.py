@@ -18,7 +18,7 @@ DoubleValue = struct.Struct('<d')
 
 class NatNetClient:
 
-    def __init__(self, Qs, publisher):
+    def __init__(self, Qs, num_robots):
         # Change this value to the IP address of the NatNet server.
         self.serverIPAddress = "128.200.3.89"
 
@@ -45,7 +45,7 @@ class NatNetClient:
         self.ts = 0.0
 
         # initialize ROS publisher object
-        self.publisher = publisher
+        self.publisher = CoordinatePublisher(num_robots)
         #tuple of queues
         self.Qs = Qs
         # start internal timer to correctly time publishes

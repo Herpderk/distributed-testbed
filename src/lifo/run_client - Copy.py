@@ -25,10 +25,10 @@ def receiveRigidBodyFrame(Qs, publisher, id, position, rotation):
             #print('TIME: ' + str(time.time()))
 
     
-def tracking(Qs, publisher):
+def tracking(Qs, num_robots):
     try:
         # Initialize client object
-        streamingClient = NatNetClient.NatNetClient(Qs, publisher)
+        streamingClient = NatNetClient.NatNetClient(Qs, num_robots)
         # Set client to read frames
         streamingClient.newFrameListener = receiveMoCapFrame
         streamingClient.rigidBodyListener = receiveRigidBodyFrame
@@ -88,12 +88,11 @@ if __name__ == '__main__':
         Qs = Qs + (locals()['lifo' + str(id)],)
     print(Qs)
 
-    #initialize coord publisher
-    publisher = CoordinatePublisher(n)
+    
     
     # create new processes
-    track_process = Process(target=tracking, args=(Qs, publisher))
-    plot_process = Process(target=plotting, args=(Qs))
+    track_process = Process(target=tracking, args=(Qs, n))
+    plot_process = Process(target=plotting, args=(Qs,))
   
     # run processes
     track_process.start()

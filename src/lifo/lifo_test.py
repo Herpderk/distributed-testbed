@@ -67,8 +67,8 @@ if __name__ == "__main__":
     print(Qs)
     
     # creating new processes
-    track_process = Process(target=tracking, args=(Qs))
-    plot_process = Process(target=plotting, args=(Qs))
+    track_process = Process(target=tracking, args=(Qs,))
+    plot_process = Process(target=plotting, args=(Qs,))
   
     # running processes
     track_process.start()
