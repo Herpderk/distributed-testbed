@@ -1,3 +1,7 @@
+# Pulls localization data from Motive Tracker's server and publishes to ROS topics.
+# Utilizes multiprocessing to simultaneously publish and update a 2D matplotlib visualization of the system.
+# The number of agents can be changed in live_plot.py, tracker ids should be a range of integers from 0 to n.
+
 from multiprocess import Process
 from multiprocess.managers import BaseManager
 from queue import LifoQueue
