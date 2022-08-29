@@ -16,6 +16,7 @@ from scipy import linalg as la
 from simple_pid import PID
 import numpy as np
 import time
+from live_plot import LivePlot
 
 
 class LQR_PID:
@@ -31,47 +32,6 @@ class LQR_PID:
 
         self.pid = PID(0.04, 0.0, 0.0, setpoint = 90*self.max_V)
         self.pid.output_limits = (0, self.max_V)
-        self.K1 = self.K_matrix()
-
-
-    # The solution to the optimal control policy u = K*x
-    def K_matrix(self):
-        A = np.eye(3)
-        B = self.time_step*np.eye(3)
-        Q = 1 * np.array([
-            [1, 0, 0],
-            [0, 1, 0],
-            [0, 0, 1]
-            ])
-        #R punishes actuation
-        R = 0.1 * np.array([
-            [1, 0, 0],
-            [0, 1, 0],
-            [0, 0, 1]
-            ])
-
-        self.A1 = np.block([
-            [A,                       B],
-            [np.zeros((3,3)), np.eye(3)]
-            ])
-        self.B1 = np.block([
-            [B        ],
-            [np.eye(3)]
-            ])
-        Q1 = np.block([
-            [Q,         np.zeros((3,3))],
-            [np.zeros((3,3)),         R]
-            ])
-        #R1 punishes turning
-        self.R1 = 4 * np.array([
-            [1, 0, 0],
-            [0, 1, 0],
-            [0, 0, 1]
-            ])
-
-        P = la.solve_discrete_are(self.A1, self.B1, Q1, self.R1)
-        K1 = la.inv(self.R1) @ self.B1.T @ P
-        return K1
 
 
     # Continuously adjusts the setpoint of the pid based on turn angles in the horizon
@@ -100,12 +60,54 @@ class LQR_PID:
             return nxt_spd
 
 
+    # The solution to the optimal control policy u = K*x
+    def K_matrix(self):
+        A = np.eye(3)
+        B = self.time_step*np.eye(3)
+        Q = 1 * np.array([
+            [1, 0, 0],
+            [0, 1, 0],
+            [0, 0, 1]
+            ])
+        #R punishes actuation
+        R = 0.1 * np.array([
+            [1, 0, 0],
+            [0, 1, 0],
+            [0, 0, 1]
+            ])
+
+        A1 = np.block([
+            [A,                       B],
+            [np.zeros((3,3)), np.eye(3)]
+            ])
+        B1 = np.block([
+            [B        ],
+            [np.eye(3)]
+            ])
+        Q1 = np.block([
+            [Q,         np.zeros((3,3))],
+            [np.zeros((3,3)),         R]
+            ])
+        #R1 punishes turning
+        R1 = 4 * np.array([
+            [1, 0, 0],
+            [0, 1, 0],
+            [0, 0, 1]
+            ])
+
+        P = la.solve_discrete_are(A1, B1, Q1, R1)
+        K1 = la.inv(R1) @ B1.T @ P
+        return A1, B1, K1
+
+
     # Calculates u, inputs the pid speed, and calculates the next state A*x - B*u
     def lqr_steer(self, path_pos, pos, vel, spd):
         error = path_pos - pos
         state = np.block([error, vel])
-        U = self.K1 @ state
-        nxt_state = (self.A1 @ state) - (self.B1 @ U)
+
+        A, B, K = self.K_matrix()
+        U = K @ state
+        nxt_state = (A @ state) - (B @ U)
 
         nxt_err, nxt_vel = np.split(nxt_state, 2)
         nxt_pos = path_pos - nxt_err
@@ -149,58 +151,19 @@ class LQR_PID:
         path = np.append(waypoints, new_col, 1)
         return path
 
-    
-    def init_plot(self, path):
-        fig, ax1 = plt.subplots(figsize=(8, 7))
-        backend = matplotlib.get_backend()
-        x, y = 900, 50
-        if backend == 'TkAgg':
-            fig.canvas.manager.window.wm_geometry("+%d+%d" % (x, y))
-        elif backend == 'WXAgg':
-            fig.canvas.manager.window.SetPosition((x, y))
-        else:
-            fig.canvas.manager.window.move(x, y)
-        plt.xlim(0, 1100)
-
-        wp_X = np.empty((1), float)
-        wp_Y = np.empty((1), float)
-        for wp in path:
-            wp_X = np.append(wp_X, wp[0])
-            wp_Y = np.append(wp_Y, wp[1])
-        ax1.scatter(wp_X, wp_Y, c='blue', s=30)
-
-        plt.show(block = False)
-        plt.pause(0.1)
-        bg = fig.canvas.copy_from_bbox(fig.bbox)
-        fig.canvas.blit(fig.bbox)
-        return ax1, fig, bg
-
-   
-    def plot_path(self, ax1, fig, bg, pos):
-        (pt,) = ax1.plot(pos[0], pos[1], 'rP', markersize=5)
-        pt.set_data(pos[0], pos[1])
-        plt.xlim(0, 1100)
-
-        fig.canvas.restore_region(bg)
-        ax1.draw_artist(pt)
-        fig.canvas.blit(fig.bbox)
-        fig.canvas.flush_events()
-
 
     # increase prediction horizon to decelerate earlier
     def path_tracking(self, path):
-        ax1, fig, bg = self.init_plot(path)
-        
+        plot = LivePlot(path)
         pos = path[0] 
+        spd = 0
         vel = np.array([0, 0, 0])   
         horizon = 6
 
         for i in range (np.size(path, 0)):
-            if np.size(path, 0) - i < horizon:
+            if np.size(path, 0) - i <= horizon:
         	    horizon = np.size(path, 0) - i - 1
-
             wp = path[i]
-            spd = 0
 
             while True:
                 error = wp - pos
@@ -214,7 +177,7 @@ class LQR_PID:
                     pos, vel = self.lqr_steer(wp, pos, vel, spd)
                     ang_spds = self.motor_spds(vel)
 
-                    self.plot_path(ax1, fig, bg, pos)
+                    plot.update(0, pos)
                     time.sleep(0.03)
                 else:
                     break
