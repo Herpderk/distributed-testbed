@@ -10,12 +10,13 @@
 # Run path_tracking, an example can be found in main. 
 
 import matplotlib
+matplotlib.use('Qt5Agg')
 import matplotlib.pyplot as plt
 from scipy import linalg as la
 from simple_pid import PID
 import numpy as np
 import time
-import control
+#import control
 
 
 class LQR_PID:
