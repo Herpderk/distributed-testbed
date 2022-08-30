@@ -7,11 +7,12 @@ import time
 
 
 class LivePlot:
+    
 
-    def __init__(self):
-        self.x_dim = 3 #mm
-        self.y_dim = 3 #mm
-        self.z_dim = 3 #mm
+    def __init__(self, path):
+        self.x_lim = np.array([-3, 3])
+        self.y_lim = np.array([-3, 3])
+        self.z_lim = np.array([-3, 3])
         # colors and number of robots, index is the id
         self.tracker_colors = np.array([
             'rP', 'gP', 'bP'
@@ -25,12 +26,20 @@ class LivePlot:
         self.x_coords = np.zeros(self.num_robots)
         self.y_coords = np.zeros(self.num_robots)
         self.z_coords = np.zeros(self.num_robots)
-        self.init_plot()
+        self.init_plot(path)
+        
 
-    def init_plot(self):
+    def init_plot(self, path):
         self.fig, self.ax1 = plt.subplots(figsize=(8, 7))
-        self.ax1.set_xlim(-self.x_dim, self.x_dim)
-        self.ax1.set_ylim(-self.y_dim, self.y_dim)
+        self.ax1.set_xlim(self.x_lim[0], self.x_lim[1])
+        self.ax1.set_ylim(self.y_lim[0], self.y_lim[1])
+        
+        wp_X = np.empty((1), float)
+        wp_Y = np.empty((1), float)
+        for wp in path:
+            wp_X = np.append(wp_X, wp[0])
+            wp_Y = np.append(wp_Y, wp[1])
+        self.ax1.scatter(wp_X, wp_Y, c='blue', s=30)
 
         plt.show(block = False)
         plt.pause(0.1)
@@ -49,8 +58,8 @@ class LivePlot:
         for i in range(self.num_robots):
             (pt,) = self.ax1.plot(self.x_coords[i], self.y_coords[i], self.tracker_colors[i], markersize=5, label="robot" + str(i))
             pt.set_data(self.x_coords[i], self.y_coords[i])
-            self.ax1.set_xlim(-self.x_dim, self.x_dim)
-            self.ax1.set_ylim(-self.y_dim, self.y_dim)
+            self.ax1.set_xlim(self.x_lim[0], self.x_lim[1])
+            self.ax1.set_ylim(self.y_lim[0], self.y_lim[1])
             self.ax1.draw_artist(pt)    
         # animation stuff
         self.fig.canvas.blit(self.fig.bbox)
