@@ -79,7 +79,7 @@ class DifferentialLQR:
         #R1 punishes change in actuation
         R1 = np.array([
             [1, 0],
-            [0, 0.3]
+            [0, 0.7]
             ])
         
         P = self.solve_DARE(A1, B1, Q1, R1)
@@ -181,7 +181,7 @@ def lissajous(size, num_points):
 if __name__ == '__main__':
     size = 900
     num_points = 1000
-    waypoints = sine_wave(size, num_points)
+    waypoints = lissajous(size, num_points)
 
     controller = DifferentialLQR(radius=64.5)
     path = controller.gen_path(waypoints)
