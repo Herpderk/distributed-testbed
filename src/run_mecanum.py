@@ -51,7 +51,7 @@ class ControllerSubscriber:
 			if error_mag > self.error_lim:
 			    net_turn = path[self.path_index + self.horizon][2] - path[self.path_index][2]
 			    self.spd = self.controller.pid_speed(self.controller.pid, net_turn, self.spd)
-			    self.vel = self.controller.lqr_steer(wp, pos, self.vel, self.spd)
+			    pos, self.vel = self.controller.lqr_steer(wp, pos, self.vel, self.spd)
 			    spin_motors = self.controller.motor_spds(self.vel)
 			    print('runtime per loop: ' + str(self.controller.time_step))
 			    print()
