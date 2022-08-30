@@ -5,10 +5,11 @@
 from multiprocess import Process
 from multiprocess.managers import BaseManager
 from queue import LifoQueue
-from NatNetClient import NatNetClient
-from live_plot import LivePlot
 import numpy as np  
 import time
+from NatNetClient import NatNetClient
+from live_plot import LivePlot
+import example_paths
 
 
 # callback function for motion capture frame
@@ -40,8 +41,8 @@ def tracking(Qs, num_robots):
         print('interrupted!')
 
 
-def plotting(Qs):
-    new_plot = LivePlot()
+def plotting(Qs, waypoints):
+    new_plot = LivePlot(waypoints)
     try:
         while True:
             #st = time.time()
@@ -76,8 +77,11 @@ if __name__ == '__main__':
     manager = MyManager()
     manager.start()
 
+    #input example sinusoid path
+    waypoints = example_paths.circle(3, 10000)
+
     # get number of robots from temporary plot and create n lifo queues
-    plot = LivePlot()
+    plot = LivePlot(waypoints)
     plot.close()
     n = plot.num_robots
 
@@ -90,7 +94,7 @@ if __name__ == '__main__':
     
     # create new processes
     track_process = Process(target=tracking, args=(Qs, n))
-    plot_process = Process(target=plotting, args=(Qs,))
+    plot_process = Process(target=plotting, args=(Qs, waypoints))
   
     # run processes
     track_process.start()
