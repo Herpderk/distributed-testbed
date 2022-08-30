@@ -55,9 +55,9 @@ class ControllerSubscriber:
 			    spin_motors = self.controller.motor_spds(self.vel)
 			    print('runtime per loop: ' + str(self.controller.time_step))
 			    print()
-		# else move on to next waypoint
-		else:
-		    self.path_index += 1
+			# else move on to next waypoint
+			else:
+		    	self.path_index += 1
 
 
 if __name__ == '__main__':
