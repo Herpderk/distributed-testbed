@@ -10,8 +10,8 @@ class LivePlot:
 
 
     def __init__(self, path):
-        self.x_lim = np.array([0, 1000]) #mm
-        self.y_lim = np.array([0, 1000]) #mm
+        self.x_lim = np.array([-10, 1000]) #mm
+        self.y_lim = np.array([-10, 1000]) #mm
         self.z_lim = np.array([0, 1000]) #mm
         # colors and number of robots, index is the id
         self.tracker_colors = np.array([
@@ -75,5 +75,5 @@ if __name__ == '__main__':
     while True:
         for i in range(3):
             new_plot.update(i, np.array([random.randrange(0, 2, 1),
-                                              random.randrange(0, 2, 1),
-                                              random.randrange(0, 2, 1)]))
+                                        random.randrange(0, 2, 1),
+                                        random.randrange(0, 2, 1)]))
