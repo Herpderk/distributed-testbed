@@ -129,8 +129,6 @@ class DifferentialLQR:
     def path_tracking(self, path):
         plot = LivePlot(path)
         pos = path[0] 
-        W = 0
-        spd = 0
         vel = np.zeros(2)   
 
         for i in range (np.size(path, 0)):
