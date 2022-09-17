@@ -14,6 +14,7 @@ matplotlib.use('Qt5Agg')
 import matplotlib.pyplot as plt
 from scipy import linalg as la
 import numpy as np
+import math
 import time
 from live_plot import LivePlot
 
@@ -22,13 +23,12 @@ class DifferentialLQR:
 
 
     def __init__(self, radius):
-        self.wheel_radius = radius # mm
-        self.time_step = 0.1       # s
+        self.dt = 0.1       # s
 
 
     def solve_DARE(self, A, B, Q, R):
         X = Q
-        maxiter = 150
+        maxiter = 100
         eps = 0.01
 
         for i in range(maxiter):
@@ -48,20 +48,20 @@ class DifferentialLQR:
             [0, 0, 1]
             ])
         B = np.array([
-            [np.cos(theta)*self.time_step, 0],
-            [np.sin(theta)*self.time_step, 0],
-            [0, self.time_step]
+            [np.cos(theta)*self.dt, 0],
+            [np.sin(theta)*self.dt, 0],
+            [0, self.dt]
             ])
         # Q punishes inaccuracy
-        Q = 1 * np.array([
-            [1, 0, 0],
-            [0, 1, 0],
-            [0, 0, 1]
+        Q = np.array([
+            [5, 0, 0],
+            [0, 5, 0],
+            [0, 0, 5]
             ])
         # R punishes actuation magnitude
-        R = 10**-1000 * np.array([
-            [1, 0],
-            [0, 1]
+        R = np.array([
+            [10**-10, 0],
+            [0, 10**-1.3]
             ])
 
         A1 = np.block([
@@ -79,7 +79,7 @@ class DifferentialLQR:
         #R1 punishes change in actuation
         R1 = np.array([
             [1, 0],
-            [0, 0.3]
+            [0, 0.7]
             ])
         
         P = self.solve_DARE(A1, B1, Q1, R1)
@@ -101,12 +101,7 @@ class DifferentialLQR:
         nxt_vel = nxt_state[1]
         nxt_pos = path_pos - nxt_err
 
-        if abs(nxt_vel[1]) >= np.pi:
-            if nxt_vel[1] > 0:
-                nxt_vel[1] = np.pi
-            if nxt_vel[1] < 0:
-                nxt_vel[1] = -np.pi
-
+        print('PATH ANGLE: ' + str(path_pos[2]))
         print('vel: ' + str(-nxt_vel[0]))
         print('ROTATIONAL VEL: ' + str(-nxt_vel[1]))
         print('pos: ' + str(nxt_pos))
@@ -119,12 +114,27 @@ class DifferentialLQR:
         for i in range(new_col.shape[0] - 1):
             x_diff = waypoints[i+1, 0] - waypoints[i, 0]
             y_diff = waypoints[i+1, 1] - waypoints[i, 1]
-            angle = np.arctan2(y_diff, x_diff)
+
+            slope = y_diff/x_diff
+            angle = np.arctan(slope)
+            if x_diff< 0:
+                angle += np.pi
             new_col[i + 1] = (angle)
 
         path = np.append(waypoints, new_col, 1)
         return path
 
+
+    def maintain_rate(self, start_time):
+        dt = time.time() - start_time
+        filler = self.dt - dt
+        print('filler time: ' + str(filler))
+        print('time step: ' + str(dt + filler))
+        if filler < 0:
+            return
+        else:
+            time.sleep(filler)
+        
 
     def path_tracking(self, path):
         plot = LivePlot(path)
@@ -135,9 +145,10 @@ class DifferentialLQR:
 
         for i in range (np.size(path, 0)):
             wp = path[i]
-            error_lim = 50 
+            error_lim = 40
 
             while True:
+                st = time.time()
                 error = wp - pos
                 error_mag = np.sqrt(np.einsum('i,i', error, error))
                 # IMPORTANT: if error limit is too small, infinite oscillation occurs
@@ -148,7 +159,7 @@ class DifferentialLQR:
 
                     if abs(vel[0]) < 10:
                         error_lim += error_lim
-                    time.sleep(0.03)
+                    #self.maintain_rate(st)
                 else:
                     break
 
@@ -173,16 +184,17 @@ def circle(size, num_points):
 def lissajous(size, num_points):
     waypoints = np.empty((0, 2), float)
     for t in range(num_points):
-        waypoints = np.append(waypoints, [[(size/2) + (size/2)*np.cos(7*2*np.pi*t/num_points), 
-                             (size/2) + (size/2)*np.sin(5*2*np.pi*t/num_points)]], axis = 0)
+        waypoints = np.append(waypoints, [[(size/2) + (size/2)*np.cos(3*2*np.pi*t/num_points), 
+                             (size/2) + (size/2)*np.sin(2*2*np.pi*t/num_points)]], axis = 0)
     return waypoints
 
 
 if __name__ == '__main__':
     size = 900
-    num_points = 1000
-    waypoints = sine_wave(size, num_points)
+    num_points = 800
+    waypoints = lissajous(size, num_points)
 
     controller = DifferentialLQR(radius=64.5)
     path = controller.gen_path(waypoints)
     controller.path_tracking(path)
+
