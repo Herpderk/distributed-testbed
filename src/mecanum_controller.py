@@ -5,7 +5,7 @@
 # This controller is intended for 4-wheel mecanum drive systems.
 
 # INSTRUCTIONS
-# Initialize LQR_PID object with the wheel radius, width, height, and desired maximum velocity.
+# Initialize LQR_PID object with the wheel radius, width, and height.
 # Path must be an array of [x,y] arrays and inputted into gen_path to be usable for the controller.
 # Run path_tracking, an example can be found in main. 
 
@@ -22,14 +22,14 @@ from live_plot import LivePlot
 class LQR_PID:
 
 
-    def __init__(self, radius, width, height, v, spd_ctrl):
+    def __init__(self, radius, width, height, spd_ctrl):
         self.wheel_radius = radius # mm
         self.center_X = width/2    # mm
         self.center_Y = height/2   # mm
-        self.max_V = v             # mm/s
         self.speed_control = spd_ctrl
-        self.time_step = 0.1       # s
+        self.dt = 0.1       # s
 
+        self.max_V = 400           # mm/s
         self.pid = PID(0.04, 0.0, 0.0, setpoint = 90*self.max_V)
         self.pid.output_limits = (0, self.max_V)
 
@@ -52,8 +52,8 @@ class LQR_PID:
                 pid.reset()
                 pid.tunings = (0.01, 0.005, 0.0)
 
-            nxt_spd = pid(curr_spd, self.time_step)
-            print('spd:' + str(nxt_spd))
+            nxt_spd = pid(curr_spd, self.dt)
+            #print('spd:' + str(nxt_spd))
             return nxt_spd
         else:
             nxt_spd = self.max_V
@@ -63,8 +63,8 @@ class LQR_PID:
     # The solution to the optimal control policy u = K*x
     def K_matrix(self):
         A = np.eye(3)
-        B = self.time_step*np.eye(3)
-        Q = 1 * np.array([
+        B = self.dt*np.eye(3)
+        Q = 4 * np.array([
             [1, 0, 0],
             [0, 1, 0],
             [0, 0, 1]
@@ -111,13 +111,15 @@ class LQR_PID:
 
         nxt_err, nxt_vel = np.split(nxt_state, 2)
         nxt_pos = path_pos - nxt_err
-
         xy_vel = np.array([nxt_vel[0], nxt_vel[1]])
+        vel_mag = np.sqrt(np.einsum('i,i', xy_vel, xy_vel))
+        
         xy_vel = spd * xy_vel / np.sqrt(np.einsum('...i,...i', xy_vel, xy_vel))
-        nxt_vel = np.block([xy_vel, nxt_vel[2]])
-
-        print('vel:' + str(nxt_vel))
-        return nxt_pos, nxt_vel
+        vel_input = np.block([xy_vel, nxt_vel[2]])
+        
+        print('vel: ' + str(vel_mag))
+        print('pos: ' + str(nxt_pos))
+        return nxt_pos, nxt_vel, vel_input
 
 
     # Uses inverse kinematics to calculate the angular velocity of each wheel
@@ -152,12 +154,23 @@ class LQR_PID:
         return path
 
 
+    def maintain_rate(self, start_time):
+        time_passed = time.time() - start_time
+        filler = self.dt - time_passed
+        print('filler time: ' + str(filler))
+        if filler < 0:
+            return
+        else:
+            time.sleep(filler)
+
+
     # increase prediction horizon to decelerate earlier
     def path_tracking(self, path):
         plot = LivePlot(path)
         pos = path[0] 
         spd = 0
-        vel = np.array([0, 0, 0])   
+        vel = np.array([0, 0, 0])
+        vel_input = np.array([0, 0, 0])
         horizon = 6
 
         for i in range (np.size(path, 0)):
@@ -166,19 +179,21 @@ class LQR_PID:
             wp = path[i]
 
             while True:
+                st = time.time()
                 error = wp - pos
                 error_mag = np.sqrt(np.einsum('i,i', error, error))
                 error_lim = 50 #10.75*self.R1[0][0] + 0.2275*self.max_V - 45
+                
             	# IMPORTANT: if error limit is too small, infinite oscillation occurs
                 if error_mag > error_lim:
                     net_turn = path[i+horizon][2] - path[i][2]
                     spd = self.pid_speed(self.pid, net_turn, spd)
 
-                    pos, vel = self.lqr_steer(wp, pos, vel, spd)
+                    pos, vel, vel_input = self.lqr_steer(wp, pos, vel_input, spd)
                     ang_spds = self.motor_spds(vel)
 
                     plot.update(0, pos)
-                    time.sleep(0.03)
+                    #self.maintain_rate(st)
                 else:
                     break
 
@@ -203,15 +218,15 @@ def circle(size, num_points):
 def lissajous(size, num_points):
     waypoints = np.empty((0, 2), float)
     for t in range(num_points):
-        waypoints = np.append(waypoints, [[(size/2) + (size/2)*np.cos(7*2*np.pi*t/num_points), 
-    	                     (size/2) + (size/2)*np.sin(5*2*np.pi*t/num_points)]], axis = 0)
+        waypoints = np.append(waypoints, [[(size/2) + (size/2)*np.cos(5*2*np.pi*t/num_points), 
+    	                     (size/2) + (size/2)*np.sin(3*2*np.pi*t/num_points)]], axis = 0)
     return waypoints
     
 
 if __name__ == "__main__":
     # wheel radius, width, height, and max velocity in terms of mm and s
     # to disable speed control (constant speed), enter False
-    controller = LQR_PID(radius=64.5, width=46.5, height=93.0, v=300.0, spd_ctrl=True)
+    controller = LQR_PID(radius=64.5, width=46.5, height=93.0, spd_ctrl=True)
     # make sure path has points in the form of (x,y) or (x,y,theta)
     size = 1000
     num_points = 1000
@@ -219,4 +234,3 @@ if __name__ == "__main__":
     # if points are (x,y) then run it through gen_path
     path = controller.gen_path(waypoints)
     controller.path_tracking(path)
-    
